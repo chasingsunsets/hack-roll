@@ -41,6 +41,9 @@ defineEmits(['draw'])
       <div class="pile-count-container">
         <span class="pile-count">{{ cardsRemaining }}</span>
       </div>
+      <div v-if="canDraw && cardsRemaining > 0" class="draw-instruction">
+        <span>Click on card deck to draw a card</span>
+      </div>
     </div>
   </div>
 </template>
@@ -197,6 +200,33 @@ defineEmits(['draw'])
       inset 3px 3px 0 #ff9a6c,
       4px 4px 0 rgba(0, 0, 0, 0.4),
       0 0 15px rgba(255, 107, 53, 0.5);
+  }
+}
+
+.draw-instruction {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: #4fc3f7;
+  color: #0d2847;
+  font-size: 0.5rem;
+  text-align: center;
+  max-width: 200px;
+  line-height: 1.4;
+  box-shadow:
+    inset -2px -2px 0 #2a8bb8,
+    inset 2px 2px 0 #6dd5ff,
+    3px 3px 0 rgba(0, 0, 0, 0.3);
+  animation: instruction-pulse 1s ease-in-out infinite;
+}
+
+@keyframes instruction-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 0.9;
   }
 }
 

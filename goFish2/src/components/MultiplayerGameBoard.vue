@@ -202,16 +202,15 @@ onMounted(() => {
     },
 
     onBannedMoveCaught: (data) => {
-      currentPenalty.value = {
-        gestureType: data.gestureType,
-        gestureName: BANNED_MOVES[data.gestureType]?.name,
-        victimName: data.victimName,
-        reporterName: data.reporterName,
-        penalties: [{ penaltyType: 'SKIP_TURN' }]
-      }
-      showBannedMoveAlert.value = true
-
       if (data.victimId === myId.value) {
+        currentPenalty.value = {
+          gestureType: data.gestureType,
+          gestureName: BANNED_MOVES[data.gestureType]?.name,
+          victimName: data.victimName,
+          reporterName: data.reporterName,
+          penalties: [{ penaltyType: 'SKIP_TURN' }]
+        }
+        showBannedMoveAlert.value = true
         gameMessage.value = {
           text: `${data.reporterName} caught YOU doing ${BANNED_MOVES[data.gestureType]?.name}!`,
           type: 'warning'
