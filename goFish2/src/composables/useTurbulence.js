@@ -2,6 +2,7 @@ import { ref } from 'vue'
 
 // Global turbulence state
 const turbulenceActive = ref(false)
+const turbulenceRevealedHands = ref([])
 const turbulenceCallbacks = []
 
 export function useTurbulence() {
@@ -28,6 +29,7 @@ export function useTurbulence() {
     const duration = 3000 + Math.random() * 2000
     setTimeout(() => {
       turbulenceActive.value = false
+      turbulenceRevealedHands.value = []
 
       // Notify all end callbacks
       turbulenceCallbacks.forEach(item => {
@@ -38,9 +40,15 @@ export function useTurbulence() {
     }, duration)
   }
 
+  const setRevealedHands = (hands) => {
+    turbulenceRevealedHands.value = hands
+  }
+
   return {
     turbulenceActive,
+    turbulenceRevealedHands,
     triggerTurbulence,
+    setRevealedHands,
     onTurbulenceStart,
     onTurbulenceEnd
   }

@@ -31,7 +31,7 @@ const props = defineProps({
 const emit = defineEmits(['leave-game'])
 
 // Turbulence state
-const { turbulenceActive } = useTurbulence()
+const { turbulenceActive, turbulenceRevealedHands, setRevealedHands } = useTurbulence()
 
 // Socket state
 const {
@@ -50,7 +50,8 @@ const {
   reportBannedMove,
   reportGesture,
   setEventHandlers,
-  disconnect
+  disconnect,
+  socket
 } = useSocket()
 
 // Local UI state
@@ -86,13 +87,33 @@ const playerRanks = computed(() => {
   return ranks.sort((a, b) => RANKS.indexOf(a) - RANKS.indexOf(b))
 })
 
-const opponentData = computed(() =>
-  opponents.value.map(opp => ({
+const opponentData = computed(() => {
+  // During turbulence, use revealed hands if available
+  if (turbulenceActive.value && turbulenceRevealedHands.value.length > 0) {
+    console.log('TURBULENCE ACTIVE! Building opponent data with revealed cards')
+    console.log('turbulenceRevealedHands:', turbulenceRevealedHands.value)
+    const data = opponents.value.map(opp => {
+      const revealedHand = turbulenceRevealedHands.value.find(h => h.id === opp.id)
+      console.log(`Opponent ${opp.name} (${opp.id}):`, revealedHand ? `${revealedHand.cards.length} cards` : 'no reveal data')
+      return {
+        name: opp.name,
+        cardCount: opp.cardCount,
+        cards: revealedHand ? revealedHand.cards : [],
+        id: opp.id
+      }
+    })
+    console.log('Final opponentData:', data)
+    return data
+  }
+
+  // Normal mode - no cards revealed
+  return opponents.value.map(opp => ({
     name: opp.name,
     cardCount: opp.cardCount,
+    cards: [],
     id: opp.id
   }))
-)
+})
 
 const canDrawCard = computed(() =>
   isMyTurn.value &&
@@ -109,7 +130,27 @@ watch(isMyTurn, (myTurn) => {
 })
 
 // Socket event handlers
+// Turbulence handler
+function handleTurbulence(code) {
+  console.log('Turbulence triggered! Room code:', code)
+  console.log('Socket exists:', !!socket.value)
+  if (code && socket.value) {
+    console.log('Emitting turbulence-start to server')
+    socket.value.emit('turbulence-start', code)
+  }
+}
+
 onMounted(() => {
+  // Listen for turbulence reveal
+  if (socket.value) {
+    console.log('Setting up turbulence-reveal listener')
+    socket.value.on('turbulence-reveal', (data) => {
+      console.log('Received turbulence-reveal from server:', data)
+      setRevealedHands(data.allHands)
+      console.log('Revealed hands set:', data.allHands)
+    })
+  }
+
   setEventHandlers({
     onCardsTransferred: (data) => {
       if (data.toPlayerId === myId.value) {
@@ -397,7 +438,7 @@ function handleLeaveGame() {
 
 <template>
   <div class="game-board" :class="{ 'turbulence-sway': turbulenceActive }">
-    <PixelBackground />
+    <PixelBackground :room-code="roomCode" @turbulence-triggered="handleTurbulence" />
 
     <!-- Visual Effects -->
     <GoFishSplash :show="showGoFishSplash" @complete="onGoFishSplashComplete" />
@@ -451,10 +492,11 @@ function handleLeaveGame() {
       <!-- Opponents row -->
       <div class="opponents-row">
         <OpponentHand
-          v-for="opp in opponents"
+          v-for="opp in opponentData"
           :key="opp.id"
           :name="opp.name"
           :card-count="opp.cardCount"
+          :cards="opp.cards || []"
           :is-current-turn="currentTurnId === opp.id"
           position="top"
         />

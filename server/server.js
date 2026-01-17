@@ -420,6 +420,24 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Turbulence event - reveals all hands temporarily
+  socket.on('turbulence-start', (roomCode) => {
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameStarted) return;
+
+    // Send all player hands (including cards) to all players
+    const allHandsData = room.players.map(p => ({
+      id: p.id,
+      name: p.name,
+      cards: p.hand,
+      cardCount: p.hand.length
+    }));
+
+    io.to(room.code).emit('turbulence-reveal', {
+      allHands: allHandsData
+    });
+  });
+
   // Report gesture detected (camera sees the reporting player doing a gesture)
   socket.on('gesture-detected', (roomCode, gestureType, callback) => {
     console.log(`Gesture detected from ${socket.id}: ${gestureType}`);

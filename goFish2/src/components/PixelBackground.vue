@@ -2,6 +2,15 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useTurbulence } from '../composables/useTurbulence'
 
+const props = defineProps({
+  roomCode: {
+    type: String,
+    default: null
+  }
+})
+
+const emit = defineEmits(['turbulence-triggered'])
+
 const { turbulenceActive, triggerTurbulence } = useTurbulence()
 
 // Generate random bubbles
@@ -167,6 +176,8 @@ const startTurbulenceTimer = () => {
     const delay = 20000 + Math.random() * 20000
     turbulenceInterval = setTimeout(() => {
       triggerTurbulence()
+      // Emit event to parent so it can notify the server
+      emit('turbulence-triggered', props.roomCode)
       scheduleNext()
     }, delay)
   }
