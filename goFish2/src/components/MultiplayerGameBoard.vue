@@ -18,6 +18,7 @@ import BannedMoveAlert from './banned-moves/BannedMoveAlert.vue'
 import { useCamera } from '../composables/useCamera'
 import { useGestureDetection } from '../composables/useGestureDetection'
 import { useSocket } from '../composables/useSocket'
+import { useTurbulence } from '../composables/useTurbulence'
 import { BANNED_MOVES } from '../services/gestureDefinitions'
 
 const props = defineProps({
@@ -28,6 +29,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['leave-game'])
+
+// Turbulence state
+const { turbulenceActive } = useTurbulence()
 
 // Socket state
 const {
@@ -392,7 +396,7 @@ function handleLeaveGame() {
 </script>
 
 <template>
-  <div class="game-board">
+  <div class="game-board" :class="{ 'turbulence-sway': turbulenceActive }">
     <PixelBackground />
 
     <!-- Visual Effects -->
@@ -541,6 +545,44 @@ function handleLeaveGame() {
   box-sizing: border-box;
   position: relative;
   font-family: 'Press Start 2P', monospace;
+}
+
+/* Turbulence effect - screen sway */
+.game-board.turbulence-sway {
+  animation: turbulence-sway 3s ease-in-out;
+}
+
+@keyframes turbulence-sway {
+  0%, 100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  10% {
+    transform: translateX(-8px) rotate(-0.3deg);
+  }
+  20% {
+    transform: translateX(6px) rotate(0.2deg);
+  }
+  30% {
+    transform: translateX(-7px) rotate(-0.25deg);
+  }
+  40% {
+    transform: translateX(5px) rotate(0.15deg);
+  }
+  50% {
+    transform: translateX(-6px) rotate(-0.2deg);
+  }
+  60% {
+    transform: translateX(4px) rotate(0.1deg);
+  }
+  70% {
+    transform: translateX(-3px) rotate(-0.1deg);
+  }
+  80% {
+    transform: translateX(2px) rotate(0.05deg);
+  }
+  90% {
+    transform: translateX(-1px) rotate(-0.02deg);
+  }
 }
 
 .game-header {
