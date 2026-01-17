@@ -322,6 +322,11 @@ export function useSocket() {
     return !!stored;
   }
 
+  // Get raw socket for WebRTC signaling (needs to add event listeners)
+  function getRawSocket() {
+    return socket.value;
+  }
+
   return {
     // State
     connected: readonly(connected),
@@ -352,6 +357,7 @@ export function useSocket() {
     reportGesture,
     setEventHandlers,
     hasSession,
-    clearSession
+    clearSession,
+    getRawSocket  // For WebRTC signaling
   };
 }
