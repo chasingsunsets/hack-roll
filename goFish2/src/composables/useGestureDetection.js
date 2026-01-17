@@ -167,16 +167,32 @@ export function useGestureDetection() {
         }
       }
 
-      // TOUCH_FACE - hand near cheek/chin
-      const faceDist = Math.min(
-        distance(indexTip, chin),
-        distance(palmCenter, { x: leftEye.x - 0.1, y: leftEye.y + 0.1 }),
-        distance(palmCenter, { x: rightEye.x + 0.1, y: rightEye.y + 0.1 })
-      );
-      if (faceDist < 0.08) {
+      // TOUCH_FACE - fingertips near cheek or chin area
+      // Check multiple fingertips against actual face landmarks
+      const fingertips = [hand[4], hand[8], hand[12], hand[16], hand[20]]; // thumb, index, middle, ring, pinky
+
+      // Face touch points: cheeks, chin, jaw area
+      const touchPoints = [
+        leftCheek,
+        rightCheek,
+        chin,
+        { x: (leftCheek.x + nose.x) / 2, y: leftCheek.y },  // left mid-face
+        { x: (rightCheek.x + nose.x) / 2, y: rightCheek.y } // right mid-face
+      ];
+
+      let minFaceDist = Infinity;
+      for (const fingertip of fingertips) {
+        for (const touchPoint of touchPoints) {
+          const dist = distance(fingertip, touchPoint);
+          if (dist < minFaceDist) minFaceDist = dist;
+        }
+      }
+
+      // Only trigger if fingertip is very close to face (< 0.06)
+      if (minFaceDist < 0.06) {
         gestures.push({
           type: 'TOUCH_FACE',
-          confidence: Math.max(0, 1 - faceDist * 10)
+          confidence: Math.max(0, 1 - minFaceDist * 15)
         });
       }
 
@@ -190,15 +206,24 @@ export function useGestureDetection() {
       }
     }
 
-    // RAISE_HANDS - both hands above shoulder level
-    if (hands.length >= 2) {
-      const wrists = hands.map(h => h[0]);
-      if (wrists.every(w => w.y < 0.4)) {
-        gestures.push({
-          type: 'RAISE_HANDS',
-          confidence: 0.9
-        });
+    // RAISE_HANDS - hands raised above face level
+    // Can trigger with one hand raised high OR both hands raised
+    let handsRaisedCount = 0;
+    for (const hand of hands) {
+      const wrist = hand[0];
+      const middleMcp = hand[9]; // Middle finger base - good reference for hand position
+      // Check if hand is above the eyes (raised position)
+      if (wrist.y < eyeCenter.y || middleMcp.y < eyeCenter.y) {
+        handsRaisedCount++;
       }
+    }
+
+    // Trigger if at least one hand is clearly raised above face
+    if (handsRaisedCount >= 1) {
+      gestures.push({
+        type: 'RAISE_HANDS',
+        confidence: handsRaisedCount >= 2 ? 1.0 : 0.8
+      });
     }
 
     return gestures;

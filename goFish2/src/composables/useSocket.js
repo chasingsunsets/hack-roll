@@ -14,6 +14,11 @@ const winner = ref(null);
 const isHost = ref(false);
 const myId = ref(null);
 const myBannedMove = ref(null);
+const sessionId = ref(null);
+
+// Session storage keys
+const SESSION_KEY = 'gofish_session_id';
+const ROOM_KEY = 'gofish_room_code';
 
 // Event callbacks
 let onPlayerJoined = null;
@@ -23,19 +28,65 @@ let onCardsTransferred = null;
 let onCardDrawn = null;
 let onBannedMoveCaught = null;
 let onPlayerDisconnected = null;
+let onPlayerRejoined = null;
 let onTurnChanged = null;
 let onTurnSkipped = null;
 
 export function useSocket() {
+  // Load session from localStorage
+  function loadSession() {
+    const storedSession = localStorage.getItem(SESSION_KEY);
+    const storedRoom = localStorage.getItem(ROOM_KEY);
+    if (storedSession) {
+      sessionId.value = storedSession;
+    }
+    if (storedRoom) {
+      roomCode.value = storedRoom;
+    }
+    return { sessionId: storedSession, roomCode: storedRoom };
+  }
+
+  // Save session to localStorage
+  function saveSession(newSessionId, newRoomCode) {
+    sessionId.value = newSessionId;
+    myId.value = newSessionId;
+    if (newSessionId) {
+      localStorage.setItem(SESSION_KEY, newSessionId);
+    }
+    if (newRoomCode) {
+      roomCode.value = newRoomCode;
+      localStorage.setItem(ROOM_KEY, newRoomCode);
+    }
+  }
+
+  // Clear session from localStorage
+  function clearSession() {
+    sessionId.value = null;
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(ROOM_KEY);
+  }
+
   function connect() {
     if (socket.value) return;
+
+    // Load existing session
+    loadSession();
 
     socket.value = io('http://localhost:3001');
 
     socket.value.on('connect', () => {
       connected.value = true;
-      myId.value = socket.value.id;
       console.log('Connected to server:', socket.value.id);
+      
+      // Try to rejoin if we have a session
+      if (sessionId.value) {
+        rejoinRoom().then(response => {
+          if (!response.success) {
+            console.log('Failed to rejoin:', response.error);
+            clearSession();
+          }
+        });
+      }
     });
 
     socket.value.on('disconnect', () => {
@@ -98,6 +149,11 @@ export function useSocket() {
       onBannedMoveCaught?.(data);
     });
 
+    socket.value.on('player-rejoined', (data) => {
+      players.value = data.players;
+      onPlayerRejoined?.(data);
+    });
+
     socket.value.on('player-disconnected', (data) => {
       players.value = data.players;
       onPlayerDisconnected?.(data);
@@ -123,14 +179,15 @@ export function useSocket() {
       hand.value = [];
       gameStarted.value = false;
       isHost.value = false;
+      clearSession();
     }
   }
 
   function createRoom(playerName) {
     return new Promise((resolve) => {
-      socket.value.emit('create-room', playerName, (response) => {
+      socket.value.emit('create-room', playerName, sessionId.value, (response) => {
         if (response.success) {
-          roomCode.value = response.roomCode;
+          saveSession(response.sessionId, response.roomCode);
           players.value = response.players;
           isHost.value = true;
         }
@@ -141,11 +198,37 @@ export function useSocket() {
 
   function joinRoom(code, playerName) {
     return new Promise((resolve) => {
-      socket.value.emit('join-room', code, playerName, (response) => {
+      socket.value.emit('join-room', code, playerName, sessionId.value, (response) => {
+        if (response.success) {
+          saveSession(response.sessionId, response.roomCode);
+          players.value = response.players;
+          isHost.value = false;
+        }
+        resolve(response);
+      });
+    });
+  }
+
+  function rejoinRoom() {
+    return new Promise((resolve) => {
+      if (!sessionId.value) {
+        resolve({ success: false, error: 'No session to rejoin' });
+        return;
+      }
+      socket.value.emit('rejoin-room', sessionId.value, (response) => {
         if (response.success) {
           roomCode.value = response.roomCode;
           players.value = response.players;
-          isHost.value = false;
+          hand.value = response.hand || [];
+          deckCount.value = response.deckCount || 0;
+          currentTurnId.value = response.currentTurnId;
+          gameStarted.value = response.gameStarted || false;
+          gameOver.value = response.gameOver || false;
+          winner.value = response.winner;
+          myBannedMove.value = response.yourBannedMove;
+          isHost.value = response.isHost || false;
+          myId.value = sessionId.value;
+          console.log('Rejoined room:', response.roomCode, 'Game started:', response.gameStarted);
         }
         resolve(response);
       });
@@ -200,8 +283,15 @@ export function useSocket() {
     onCardDrawn = handlers.onCardDrawn;
     onBannedMoveCaught = handlers.onBannedMoveCaught;
     onPlayerDisconnected = handlers.onPlayerDisconnected;
+    onPlayerRejoined = handlers.onPlayerRejoined;
     onTurnChanged = handlers.onTurnChanged;
     onTurnSkipped = handlers.onTurnSkipped;
+  }
+
+  // Check if we have an existing session
+  function hasSession() {
+    const stored = localStorage.getItem(SESSION_KEY);
+    return !!stored;
   }
 
   return {
@@ -218,17 +308,21 @@ export function useSocket() {
     isHost: readonly(isHost),
     myId: readonly(myId),
     myBannedMove: readonly(myBannedMove),
+    sessionId: readonly(sessionId),
 
     // Methods
     connect,
     disconnect,
     createRoom,
     joinRoom,
+    rejoinRoom,
     startGame,
     askForCards,
     drawCard,
     reportBannedMove,
     reportGesture,
-    setEventHandlers
+    setEventHandlers,
+    hasSession,
+    clearSession
   };
 }

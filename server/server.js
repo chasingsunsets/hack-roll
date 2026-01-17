@@ -21,8 +21,14 @@ const BANNED_MOVES = ['SCRATCH_HEAD', 'TOUCH_FACE', 'COVER_MOUTH', 'LOOK_AWAY', 
 
 // Game rooms storage
 const rooms = new Map();
+// Player session storage (maps sessionId to room info)
+const sessions = new Map();
 
 // Helper functions
+function generateSessionId() {
+  return 'sess_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+}
+
 function createDeck() {
   const deck = [];
   for (const suit of SUITS) {
@@ -51,7 +57,7 @@ function generateRoomCode() {
   return code;
 }
 
-function createRoom(hostId, hostName) {
+function createRoom(hostSocketId, hostName, sessionId) {
   let code;
   do {
     code = generateRoomCode();
@@ -59,9 +65,10 @@ function createRoom(hostId, hostName) {
 
   const room = {
     code,
-    hostId,
+    hostId: sessionId,
     players: [{
-      id: hostId,
+      id: sessionId,
+      socketId: hostSocketId,
       name: hostName,
       hand: [],
       books: [],
@@ -77,6 +84,10 @@ function createRoom(hostId, hostName) {
   };
 
   rooms.set(code, room);
+
+  // Store session mapping
+  sessions.set(sessionId, { roomCode: code, playerName: hostName });
+
   return room;
 }
 
@@ -187,19 +198,34 @@ io.on('connection', (socket) => {
   console.log('Player connected:', socket.id);
 
   // Create a new room
-  socket.on('create-room', (playerName, callback) => {
-    const room = createRoom(socket.id, playerName);
+  socket.on('create-room', (playerName, existingSessionId, callback) => {
+    // Handle old API (no sessionId)
+    if (typeof existingSessionId === 'function') {
+      callback = existingSessionId;
+      existingSessionId = null;
+    }
+
+    const sessionId = existingSessionId || generateSessionId();
+    const room = createRoom(socket.id, playerName, sessionId);
     socket.join(room.code);
-    console.log(`Room ${room.code} created by ${playerName}`);
+    socket.sessionId = sessionId;
+    console.log(`Room ${room.code} created by ${playerName} (session: ${sessionId})`);
     callback({
       success: true,
       roomCode: room.code,
-      players: getPublicPlayerData(room.players, socket.id)
+      sessionId: sessionId,
+      players: getPublicPlayerData(room.players, sessionId)
     });
   });
 
   // Join an existing room
-  socket.on('join-room', (roomCode, playerName, callback) => {
+  socket.on('join-room', (roomCode, playerName, existingSessionId, callback) => {
+    // Handle old API (no sessionId)
+    if (typeof existingSessionId === 'function') {
+      callback = existingSessionId;
+      existingSessionId = null;
+    }
+
     const room = rooms.get(roomCode.toUpperCase());
 
     if (!room) {
@@ -217,8 +243,11 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const sessionId = existingSessionId || generateSessionId();
+
     const player = {
-      id: socket.id,
+      id: sessionId,
+      socketId: socket.id,
       name: playerName,
       hand: [],
       books: [],
@@ -229,19 +258,89 @@ io.on('connection', (socket) => {
 
     room.players.push(player);
     socket.join(roomCode.toUpperCase());
+    socket.sessionId = sessionId;
 
-    console.log(`${playerName} joined room ${roomCode}`);
+    // Store session mapping
+    sessions.set(sessionId, { roomCode: room.code, playerName });
+
+    console.log(`${playerName} joined room ${roomCode} (session: ${sessionId})`);
 
     // Notify all players in room
-    io.to(room.code).emit('player-joined', {
-      players: getPublicPlayerData(room.players, socket.id),
-      newPlayer: playerName
-    });
+    for (const p of room.players) {
+      if (p.socketId) {
+        io.to(p.socketId).emit('player-joined', {
+          players: getPublicPlayerData(room.players, p.id),
+          newPlayer: playerName
+        });
+      }
+    }
 
     callback({
       success: true,
       roomCode: room.code,
-      players: getPublicPlayerData(room.players, socket.id)
+      sessionId: sessionId,
+      players: getPublicPlayerData(room.players, sessionId)
+    });
+  });
+
+  // Rejoin a room after refresh/disconnect
+  socket.on('rejoin-room', (sessionId, callback) => {
+    const sessionData = sessions.get(sessionId);
+
+    if (!sessionData) {
+      callback({ success: false, error: 'Session not found' });
+      return;
+    }
+
+    const room = rooms.get(sessionData.roomCode);
+
+    if (!room) {
+      sessions.delete(sessionId);
+      callback({ success: false, error: 'Room no longer exists' });
+      return;
+    }
+
+    const player = room.players.find(p => p.id === sessionId);
+
+    if (!player) {
+      sessions.delete(sessionId);
+      callback({ success: false, error: 'Player not in room' });
+      return;
+    }
+
+    // Update socket connection
+    player.socketId = socket.id;
+    player.connected = true;
+    socket.sessionId = sessionId;
+    socket.join(room.code);
+
+    console.log(`${player.name} rejoined room ${room.code} (session: ${sessionId})`);
+
+    // Notify other players
+    for (const p of room.players) {
+      if (p.id !== sessionId && p.socketId) {
+        io.to(p.socketId).emit('player-rejoined', {
+          playerId: sessionId,
+          playerName: player.name,
+          players: getPublicPlayerData(room.players, p.id)
+        });
+      }
+    }
+
+    // Send full game state to rejoining player
+    callback({
+      success: true,
+      roomCode: room.code,
+      sessionId: sessionId,
+      players: getPublicPlayerData(room.players, sessionId),
+      hand: player.hand,
+      deckCount: room.deck.length,
+      currentTurnId: room.players[room.currentTurnIndex]?.id,
+      gameStarted: room.gameStarted,
+      gameOver: room.gameOver,
+      winner: room.winner,
+      yourBannedMove: player.bannedMove,
+      isHost: room.hostId === sessionId
     });
   });
 
@@ -254,7 +353,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if (room.hostId !== socket.id) {
+    if (room.hostId !== socket.sessionId) {
       callback({ success: false, error: 'Only the host can start the game' });
       return;
     }
@@ -270,13 +369,15 @@ io.on('connection', (socket) => {
 
     // Send game state to each player (with their own hand and banned move)
     for (const player of room.players) {
-      io.to(player.id).emit('game-started', {
-        players: getPublicPlayerData(room.players, player.id),
-        hand: player.hand,
-        deckCount: room.deck.length,
-        currentTurnId: room.players[room.currentTurnIndex].id,
-        yourBannedMove: player.bannedMove // Tell each player their own banned move
-      });
+      if (player.socketId) {
+        io.to(player.socketId).emit('game-started', {
+          players: getPublicPlayerData(room.players, player.id),
+          hand: player.hand,
+          deckCount: room.deck.length,
+          currentTurnId: room.players[room.currentTurnIndex].id,
+          yourBannedMove: player.bannedMove
+        });
+      }
     }
 
     callback({ success: true });
@@ -292,7 +393,7 @@ io.on('connection', (socket) => {
     }
 
     const currentPlayer = room.players[room.currentTurnIndex];
-    if (currentPlayer.id !== socket.id) {
+    if (currentPlayer.id !== socket.sessionId) {
       callback({ success: false, error: 'Not your turn' });
       return;
     }
@@ -316,19 +417,21 @@ io.on('connection', (socket) => {
 
       // Notify all players
       for (const player of room.players) {
-        io.to(player.id).emit('cards-transferred', {
-          fromPlayerId: targetPlayerId,
-          toPlayerId: socket.id,
-          rank,
-          count: matchingCards.length,
-          hand: player.hand,
-          players: getPublicPlayerData(room.players, player.id),
-          deckCount: room.deck.length,
-          currentTurnId: currentPlayer.id, // Same player continues
-          completedBooks,
-          gameOver,
-          winner: room.winner
-        });
+        if (player.socketId) {
+          io.to(player.socketId).emit('cards-transferred', {
+            fromPlayerId: targetPlayerId,
+            toPlayerId: socket.sessionId,
+            rank,
+            count: matchingCards.length,
+            hand: player.hand,
+            players: getPublicPlayerData(room.players, player.id),
+            deckCount: room.deck.length,
+            currentTurnId: currentPlayer.id, // Same player continues
+            completedBooks,
+            gameOver,
+            winner: room.winner
+          });
+        }
       }
 
       callback({ success: true, gotCards: true, count: matchingCards.length });
@@ -348,7 +451,7 @@ io.on('connection', (socket) => {
     }
 
     const currentPlayer = room.players[room.currentTurnIndex];
-    if (currentPlayer.id !== socket.id) {
+    if (currentPlayer.id !== socket.sessionId) {
       callback({ success: false, error: 'Not your turn' });
       return;
     }
@@ -368,17 +471,19 @@ io.on('connection', (socket) => {
 
     // Notify all players
     for (const player of room.players) {
-      io.to(player.id).emit('card-drawn', {
-        playerId: socket.id,
-        drawnCard: player.id === socket.id ? drawnCard : null, // Only show card to drawer
-        hand: player.hand,
-        players: getPublicPlayerData(room.players, player.id),
-        deckCount: room.deck.length,
-        currentTurnId: room.players[room.currentTurnIndex].id,
-        completedBooks,
-        gameOver,
-        winner: room.winner
-      });
+      if (player.socketId) {
+        io.to(player.socketId).emit('card-drawn', {
+          playerId: socket.sessionId,
+          drawnCard: player.id === socket.sessionId ? drawnCard : null, // Only show card to drawer
+          hand: player.hand,
+          players: getPublicPlayerData(room.players, player.id),
+          deckCount: room.deck.length,
+          currentTurnId: room.players[room.currentTurnIndex].id,
+          completedBooks,
+          gameOver,
+          winner: room.winner
+        });
+      }
     }
 
     callback({ success: true, drawnCard });
@@ -393,7 +498,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const reporter = room.players.find(p => p.id === socket.id);
+    const reporter = room.players.find(p => p.id === socket.sessionId);
     const victim = room.players.find(p => p.id === victimId);
 
     if (!reporter || !victim) {
@@ -422,7 +527,7 @@ io.on('connection', (socket) => {
 
   // Report gesture detected (camera sees the reporting player doing a gesture)
   socket.on('gesture-detected', (roomCode, gestureType, callback) => {
-    console.log(`Gesture detected from ${socket.id}: ${gestureType}`);
+    console.log(`Gesture detected from ${socket.sessionId}: ${gestureType}`);
     const room = rooms.get(roomCode);
 
     if (!room || !room.gameStarted) {
@@ -431,7 +536,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const player = room.players.find(p => p.id === socket.id);
+    const player = room.players.find(p => p.id === socket.sessionId);
 
     if (!player) {
       console.log('Player not found');
@@ -444,7 +549,7 @@ io.on('connection', (socket) => {
     // Check if this gesture is the player's OWN banned move (they got caught!)
     if (player.bannedMove === gestureType) {
       // Pick a random other player as the "catcher"
-      const otherPlayers = room.players.filter(p => p.id !== socket.id && p.connected);
+      const otherPlayers = room.players.filter(p => p.id !== socket.sessionId && p.connected);
       const catcher = otherPlayers.length > 0
         ? otherPlayers[Math.floor(Math.random() * otherPlayers.length)]
         : { id: 'system', name: 'The System' };
@@ -471,18 +576,19 @@ io.on('connection', (socket) => {
 
   // Handle disconnection
   socket.on('disconnect', () => {
-    console.log('Player disconnected:', socket.id);
+    console.log('Player disconnected:', socket.id, 'sessionId:', socket.sessionId);
 
     // Find and update any rooms this player was in
     for (const [code, room] of rooms) {
-      const playerIndex = room.players.findIndex(p => p.id === socket.id);
+      const playerIndex = room.players.findIndex(p => p.id === socket.sessionId);
       if (playerIndex !== -1) {
         room.players[playerIndex].connected = false;
+        room.players[playerIndex].socketId = null; // Clear the socket reference
 
         if (room.gameStarted) {
           // Notify other players
           io.to(code).emit('player-disconnected', {
-            playerId: socket.id,
+            playerId: socket.sessionId,
             playerName: room.players[playerIndex].name,
             players: getPublicPlayerData(room.players, null)
           });
@@ -495,18 +601,19 @@ io.on('connection', (socket) => {
             });
           }
         } else {
-          // Game hasn't started, remove player
+          // Game hasn't started, remove player from session
+          sessions.delete(socket.sessionId);
           room.players.splice(playerIndex, 1);
 
           if (room.players.length === 0) {
             rooms.delete(code);
           } else {
             // If host left, assign new host
-            if (room.hostId === socket.id) {
+            if (room.hostId === socket.sessionId) {
               room.hostId = room.players[0].id;
             }
             io.to(code).emit('player-left', {
-              playerId: socket.id,
+              playerId: socket.sessionId,
               players: getPublicPlayerData(room.players, null),
               newHostId: room.hostId
             });

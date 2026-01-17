@@ -106,6 +106,13 @@ watch(isMyTurn, (myTurn) => {
 
 // Socket event handlers
 onMounted(() => {
+  // Set initial message based on whether it's our turn
+  if (isMyTurn.value) {
+    gameMessage.value = { text: 'Your turn! Select a card to ask for.', type: 'action' }
+  } else {
+    gameMessage.value = { text: 'Waiting for other players...', type: 'info' }
+  }
+
   setEventHandlers({
     onCardsTransferred: (data) => {
       if (data.toPlayerId === myId.value) {
@@ -198,16 +205,15 @@ onMounted(() => {
           type: 'info'
         }
       }
+    },
+
+    onPlayerRejoined: (data) => {
+      gameMessage.value = {
+        text: `${data.playerName} reconnected!`,
+        type: 'success'
+      }
     }
   })
-
-  // Set initial message based on turn
-  if (isMyTurn.value) {
-    gameMessage.value = { text: 'Your turn! Select a card to ask for.', type: 'action' }
-  } else {
-    const currentPlayer = players.value.find(p => p.id === currentTurnId.value)
-    gameMessage.value = { text: `Waiting for ${currentPlayer?.name}...`, type: 'info' }
-  }
 })
 
 onUnmounted(() => {

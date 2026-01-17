@@ -43,7 +43,20 @@ body {
   min-width: 320px;
   min-height: 100vh;
   overflow-x: hidden;
+  background: transparent;
+}
+
+/* Fallback background for pages without PixelBackground */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   background: var(--ocean-abyss);
+  z-index: -2;
+  pointer-events: none;
 }
 
 #app {
@@ -255,6 +268,37 @@ body.card-gain-celebration {
 
 body.card-gain-celebration .game-board {
   animation: cardGainBounce 0.8s ease-out;
+}
+
+/* Go Fish screen shake effect */
+body.go-fish-shake {
+  animation: goFishShake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes goFishShake {
+  0%, 100% { transform: translateX(0) translateY(0); }
+  10% { transform: translateX(-8px) translateY(-4px); }
+  20% { transform: translateX(8px) translateY(2px); }
+  30% { transform: translateX(-6px) translateY(-2px); }
+  40% { transform: translateX(6px) translateY(4px); }
+  50% { transform: translateX(-4px) translateY(-2px); }
+  60% { transform: translateX(4px) translateY(2px); }
+  70% { transform: translateX(-2px) translateY(-1px); }
+  80% { transform: translateX(2px) translateY(1px); }
+  90% { transform: translateX(-1px) translateY(0); }
+}
+
+/* Book complete celebration shake */
+body.book-complete-shake {
+  animation: bookCompleteShake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes bookCompleteShake {
+  0%, 100% { transform: translateY(0); }
+  20% { transform: translateY(-6px); }
+  40% { transform: translateY(4px); }
+  60% { transform: translateY(-3px); }
+  80% { transform: translateY(2px); }
 }
 
 @keyframes cardGainShake {
