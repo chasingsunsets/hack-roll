@@ -42,29 +42,28 @@
 1. Go to [vercel.com](https://vercel.com) → Sign in with GitHub
 2. Click **"Add New..."** → **"Project"**
 3. Import your repository
-4. Settings:
-   - Framework: **Vite**
-   - Root Directory: **./goFish2** (or leave as default if vercel.json is set)
+4. **IMPORTANT:** Click **"Edit"** next to Root Directory
+5. Set Root Directory to: **goFish2**
+6. Settings should auto-detect:
+   - Framework Preset: **Vite**
    - Build Command: `npm run build`
    - Output Directory: `dist`
+7. Leave these as auto-detected (don't change them)
 
 ### Add environment variable
-5. Go to **"Settings"** → **"Environment Variables"**
-6. Click **"Add New"**
-7. Add variable:
+8. Before deploying, go to **"Environment Variables"** section (scroll down)
+9. Click **"Add"** under Environment Variables
+10. Add variable:
    ```
-   Name: VITE_SERVER_URL
+   Key: VITE_SERVER_URL
    Value: https://gofish-server.onrender.com
    ```
    (Replace with your actual Render URL from step 1.9)
-8. Select all environments: ✓ Production  ✓ Preview  ✓ Development
-9. Click **"Save"**
+11. Select all environments: ✓ Production  ✓ Preview  ✓ Development
+12. Click **"Add"**
 
-10. Click **"Deploy"**
-11. Wait 1-2 minutes for initial deployment
-12. After first deployment completes, go to **"Deployments"** tab
-13. Click the three dots (...) on your latest deployment → **"Redeploy"**
-14. Wait for redeploy to complete (this applies the environment variable)
+13. Now click **"Deploy"** button
+14. Wait 1-2 minutes for deployment to complete
 15. **Copy your frontend URL** (e.g., `https://your-app.vercel.app`)
 
 ---
