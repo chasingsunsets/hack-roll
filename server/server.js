@@ -5,6 +5,17 @@ import cors from 'cors';
 
 const app = express();
 app.use(cors());
+app.use(express.json());
+
+// Health check endpoint for Render
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    activeRooms: rooms.size,
+    activeSessions: sessions.size
+  });
+});
 
 const server = createServer(app);
 
@@ -18,11 +29,28 @@ const allowedOrigins = [
   ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : [])
 ];
 
+// Function to check if origin is allowed (includes .vercel.app domains)
+function isOriginAllowed(origin) {
+  if (!origin) return true; // Allow requests with no origin
+  if (allowedOrigins.includes(origin)) return true;
+  // Allow all .vercel.app domains
+  if (origin.endsWith('.vercel.app')) return true;
+  return false;
+}
+
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
-    methods: ["GET", "POST"]
-  }
+    origin: function(origin, callback) {
+      if (isOriginAllowed(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  transports: ['websocket', 'polling']
 });
 
 // Constants
@@ -736,6 +764,52 @@ io.on('connection', (socket) => {
       }
     }
   });
+
+  // WebRTC signaling events
+  socket.on('webrtc-offer', ({ to, offer }) => {
+    const room = Array.from(rooms.values()).find(r =>
+      r.players.some(p => p.socketId === socket.id)
+    )
+    if (room) {
+      const targetPlayer = room.players.find(p => p.id === to)
+      if (targetPlayer && targetPlayer.socketId) {
+        io.to(targetPlayer.socketId).emit('webrtc-offer', {
+          from: socket.sessionId,
+          offer
+        })
+      }
+    }
+  })
+
+  socket.on('webrtc-answer', ({ to, answer }) => {
+    const room = Array.from(rooms.values()).find(r =>
+      r.players.some(p => p.socketId === socket.id)
+    )
+    if (room) {
+      const targetPlayer = room.players.find(p => p.id === to)
+      if (targetPlayer && targetPlayer.socketId) {
+        io.to(targetPlayer.socketId).emit('webrtc-answer', {
+          from: socket.sessionId,
+          answer
+        })
+      }
+    }
+  })
+
+  socket.on('webrtc-ice-candidate', ({ to, candidate }) => {
+    const room = Array.from(rooms.values()).find(r =>
+      r.players.some(p => p.socketId === socket.id)
+    )
+    if (room) {
+      const targetPlayer = room.players.find(p => p.id === to)
+      if (targetPlayer && targetPlayer.socketId) {
+        io.to(targetPlayer.socketId).emit('webrtc-ice-candidate', {
+          from: socket.sessionId,
+          candidate
+        })
+      }
+    }
+  })
 });
 
 const PORT = process.env.PORT || 3001;

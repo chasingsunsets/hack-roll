@@ -339,6 +339,7 @@ export function useSocket() {
     myId: readonly(myId),
     myBannedMove: readonly(myBannedMove),
     sessionId: readonly(sessionId),
+    socket: readonly(socket),
 
     // Methods
     connect,
