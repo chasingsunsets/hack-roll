@@ -73,6 +73,8 @@ export function useSocket() {
     loadSession();
 
     const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+    console.log('Connecting to server:', serverUrl);
+    console.log('Environment variables:', import.meta.env);
     socket.value = io(serverUrl);
 
     socket.value.on('connect', () => {
