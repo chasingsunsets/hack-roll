@@ -1,5 +1,7 @@
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   message: {
     type: String,
     required: true
@@ -9,10 +11,14 @@ defineProps({
     default: 'info' // 'info', 'success', 'warning', 'action'
   }
 })
+
+const isChaosMessage = computed(() => {
+  return props.message.includes('CHAOS!')
+})
 </script>
 
 <template>
-  <div class="game-message pixel-message" :class="type">
+  <div class="game-message pixel-message" :class="[type, { chaos: isChaosMessage }]">
     <div class="message-content">
       <span class="message-text">{{ message }}</span>
     </div>
@@ -105,6 +111,86 @@ defineProps({
   }
   50% {
     transform: scale(1.02);
+  }
+}
+
+/* Chaos message special effects */
+.game-message.chaos {
+  animation: slideIn 0.3s ease, chaosMessagePop 0.6s ease-out, chaosMessageShake 0.8s ease-in-out;
+  border-width: 5px;
+}
+
+.game-message.chaos .message-text {
+  animation: chaosTextFlash 0.5s ease-in-out;
+  text-shadow: 
+    0 0 10px currentColor,
+    0 0 20px currentColor,
+    2px 2px 0 rgba(0, 0, 0, 0.8);
+}
+
+@keyframes chaosMessagePop {
+  0% {
+    transform: scale(0.5) rotate(-10deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.15) rotate(5deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes chaosMessageShake {
+  0%, 100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  10% {
+    transform: translateX(-5px) rotate(-2deg);
+  }
+  20% {
+    transform: translateX(5px) rotate(2deg);
+  }
+  30% {
+    transform: translateX(-3px) rotate(-1deg);
+  }
+  40% {
+    transform: translateX(3px) rotate(1deg);
+  }
+  50% {
+    transform: translateX(-2px) rotate(-0.5deg);
+  }
+  60% {
+    transform: translateX(2px) rotate(0.5deg);
+  }
+  70% {
+    transform: translateX(-1px) rotate(-0.3deg);
+  }
+  80% {
+    transform: translateX(1px) rotate(0.3deg);
+  }
+  90% {
+    transform: translateX(0) rotate(0deg);
+  }
+}
+
+@keyframes chaosTextFlash {
+  0%, 100% {
+    color: currentColor;
+    transform: scale(1);
+  }
+  25% {
+    color: #ffd700;
+    transform: scale(1.1);
+  }
+  50% {
+    color: #ff6b35;
+    transform: scale(1.05);
+  }
+  75% {
+    color: #ffd700;
+    transform: scale(1.1);
   }
 }
 </style>

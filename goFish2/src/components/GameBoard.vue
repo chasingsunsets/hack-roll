@@ -8,6 +8,7 @@ import GameMessage from './GameMessage.vue'
 import AskRankModal from './AskRankModal.vue'
 import PixelBackground from './PixelBackground.vue'
 import PixelFish from './PixelFish.vue'
+import ChaosButton from './ChaosButton.vue'
 
 // Constants
 const SUITS = ['♠', '♥', '♦', '♣']
@@ -31,6 +32,14 @@ const selectedOpponent = ref(null)
 const gameOver = ref(false)
 const winner = ref(null)
 
+// Chaos button state
+const chaosButtonCooldown = ref(0)
+const previewedCard = ref(null) // For preview actions
+
+// Card gain animation state
+const cardGainAnimation = ref(false)
+const lastHandSize = ref(0)
+
 // Computed
 const playerRanks = computed(() => {
   const ranks = [...new Set(playerHand.value.map(card => card.rank))]
@@ -53,6 +62,12 @@ const canDrawCard = computed(() =>
   deck.value.length > 0 &&
   selectedCard.value === null &&
   gameMessage.value.type === 'warning'
+)
+
+const chaosButtonAvailable = computed(() =>
+  chaosButtonCooldown.value === 0 &&
+  currentTurn.value === 'player' &&
+  !gameOver.value
 )
 
 // Functions
@@ -147,6 +162,10 @@ function askForCards(opponentName, rank) {
   if (matchingCards.length > 0) {
     // Success! Get the cards
     opponent.hand = opponent.hand.filter(card => card.rank !== rank)
+    
+    // Trigger card gain animation
+    triggerCardGainAnimation(matchingCards)
+    
     playerHand.value.push(...matchingCards)
     sortHand(playerHand.value)
 
@@ -182,6 +201,10 @@ function drawCard() {
   if (deck.value.length === 0 || currentTurn.value !== 'player') return
 
   const drawnCard = deck.value.pop()
+  
+  // Trigger card gain animation
+  triggerCardGainAnimation([drawnCard])
+  
   playerHand.value.push(drawnCard)
   sortHand(playerHand.value)
 
@@ -245,6 +268,11 @@ function nextTurn() {
   const currentIndex = turnOrder.indexOf(currentTurn.value)
   const nextIndex = (currentIndex + 1) % turnOrder.length
   currentTurn.value = turnOrder[nextIndex]
+
+  // Decrement chaos button cooldown when it's the player's turn
+  if (currentTurn.value === 'player' && chaosButtonCooldown.value > 0) {
+    chaosButtonCooldown.value--
+  }
 
   if (currentTurn.value !== 'player') {
     setTimeout(() => {
@@ -362,6 +390,304 @@ function checkGameOver() {
   }
 }
 
+// Chaos button actions
+function swapHandsWithOpponent() {
+  const opponentsWithCards = opponents.value.filter(opp => opp.hand.length > 0)
+  if (opponentsWithCards.length === 0 || playerHand.value.length === 0) return false
+
+  const randomOpponent = opponentsWithCards[Math.floor(Math.random() * opponentsWithCards.length)]
+  const tempHand = [...playerHand.value]
+  playerHand.value = [...randomOpponent.hand]
+  randomOpponent.hand = tempHand
+  sortHand(playerHand.value)
+
+  gameMessage.value = {
+    text: `CHAOS! You swapped hands with ${randomOpponent.name}!`,
+    type: 'warning'
+  }
+  checkForBooks('player')
+  checkForBooks(randomOpponent.name)
+  return true
+}
+
+function previewOpponentCard() {
+  const opponentsWithCards = opponents.value.filter(opp => opp.hand.length > 0)
+  if (opponentsWithCards.length === 0) return false
+
+  const randomOpponent = opponentsWithCards[Math.floor(Math.random() * opponentsWithCards.length)]
+  const randomCard = randomOpponent.hand[Math.floor(Math.random() * randomOpponent.hand.length)]
+  previewedCard.value = { opponent: randomOpponent.name, card: randomCard }
+
+  gameMessage.value = {
+    text: `CHAOS! You peeked at ${randomOpponent.name}'s ${randomCard.rank}${randomCard.suit}!`,
+    type: 'info'
+  }
+
+  // Clear preview after 3 seconds
+  setTimeout(() => {
+    previewedCard.value = null
+  }, 3000)
+  return true
+}
+
+function stealRandomCard() {
+  const opponentsWithCards = opponents.value.filter(opp => opp.hand.length > 0)
+  if (opponentsWithCards.length === 0) return false
+
+  const randomOpponent = opponentsWithCards[Math.floor(Math.random() * opponentsWithCards.length)]
+  const randomIndex = Math.floor(Math.random() * randomOpponent.hand.length)
+  const stolenCard = randomOpponent.hand.splice(randomIndex, 1)[0]
+  
+  // Trigger card gain animation
+  triggerCardGainAnimation([stolenCard])
+  
+  playerHand.value.push(stolenCard)
+  sortHand(playerHand.value)
+
+  gameMessage.value = {
+    text: `CHAOS! You stole ${randomOpponent.name}'s ${stolenCard.rank}${stolenCard.suit}!`,
+    type: 'success'
+  }
+  checkForBooks('player')
+  return true
+}
+
+function giveRandomCard() {
+  if (playerHand.value.length === 0) return false
+  const opponentsWithSpace = opponents.value.filter(opp => true) // All opponents can receive cards
+
+  const randomIndex = Math.floor(Math.random() * playerHand.value.length)
+  const givenCard = playerHand.value.splice(randomIndex, 1)[0]
+  const randomOpponent = opponentsWithSpace[Math.floor(Math.random() * opponentsWithSpace.length)]
+  randomOpponent.hand.push(givenCard)
+
+  gameMessage.value = {
+    text: `CHAOS! You gave ${randomOpponent.name} your ${givenCard.rank}${givenCard.suit}!`,
+    type: 'warning'
+  }
+  checkForBooks(randomOpponent.name)
+  return true
+}
+
+function drawExtraCards() {
+  if (deck.value.length === 0) return false
+  const cardsToDraw = Math.min(2, deck.value.length)
+  const drawnCards = []
+  for (let i = 0; i < cardsToDraw; i++) {
+    drawnCards.push(deck.value.pop())
+  }
+  
+  // Trigger card gain animation
+  triggerCardGainAnimation(drawnCards)
+  
+  playerHand.value.push(...drawnCards)
+  sortHand(playerHand.value)
+
+  gameMessage.value = {
+    text: `CHAOS! You drew ${cardsToDraw} extra card${cardsToDraw > 1 ? 's' : ''}!`,
+    type: 'success'
+  }
+  checkForBooks('player')
+  return true
+}
+
+function discardRandomCards() {
+  if (playerHand.value.length === 0) return false
+  const cardsToDiscard = Math.min(2, playerHand.value.length)
+  const discarded = []
+  for (let i = 0; i < cardsToDiscard; i++) {
+    const randomIndex = Math.floor(Math.random() * playerHand.value.length)
+    discarded.push(playerHand.value.splice(randomIndex, 1)[0])
+  }
+
+  gameMessage.value = {
+    text: `CHAOS! You discarded ${cardsToDiscard} card${cardsToDiscard > 1 ? 's' : ''}!`,
+    type: 'warning'
+  }
+  return true
+}
+
+function forceOpponentDiscard() {
+  const opponentsWithCards = opponents.value.filter(opp => opp.hand.length > 0)
+  if (opponentsWithCards.length === 0) return false
+
+  const randomOpponent = opponentsWithCards[Math.floor(Math.random() * opponentsWithCards.length)]
+  const randomIndex = Math.floor(Math.random() * randomOpponent.hand.length)
+  const discarded = randomOpponent.hand.splice(randomIndex, 1)[0]
+
+  gameMessage.value = {
+    text: `CHAOS! ${randomOpponent.name} was forced to discard a card!`,
+    type: 'info'
+  }
+  return true
+}
+
+function revealRankAcrossHands() {
+  const allRanks = [...new Set([...playerHand.value, ...opponents.value.flatMap(o => o.hand)].map(c => c.rank))]
+  if (allRanks.length === 0) return false
+
+  const randomRank = allRanks[Math.floor(Math.random() * allRanks.length)]
+  const playerCount = playerHand.value.filter(c => c.rank === randomRank).length
+  const opponentCounts = opponents.value.map(opp => ({
+    name: opp.name,
+    count: opp.hand.filter(c => c.rank === randomRank).length
+  }))
+
+  const counts = opponentCounts.map(o => `${o.name}: ${o.count}`).join(', ')
+  gameMessage.value = {
+    text: `CHAOS! Revealed ${randomRank}s - You: ${playerCount}, ${counts}`,
+    type: 'info'
+  }
+  return true
+}
+
+function getBestRankHint() {
+  if (playerHand.value.length === 0) return false
+
+  // Find rank with most cards in player's hand
+  const rankCounts = {}
+  for (const card of playerHand.value) {
+    rankCounts[card.rank] = (rankCounts[card.rank] || 0) + 1
+  }
+
+  let bestRank = null
+  let maxCount = 0
+  for (const rank in rankCounts) {
+    if (rankCounts[rank] > maxCount) {
+      maxCount = rankCounts[rank]
+      bestRank = rank
+    }
+  }
+
+  if (bestRank) {
+    gameMessage.value = {
+      text: `CHAOS! Hint: You have ${maxCount} ${bestRank}${maxCount > 1 ? 's' : ''} - good to ask for!`,
+      type: 'info'
+    }
+    return true
+  }
+  return false
+}
+
+function shuffleAllHands() {
+  // Collect all cards from all hands
+  const allCards = [...playerHand.value]
+  for (const opp of opponents.value) {
+    allCards.push(...opp.hand)
+    opp.hand = []
+  }
+  playerHand.value = []
+
+  // Shuffle all cards
+  const shuffled = shuffle(allCards)
+
+  // Redistribute evenly
+  const players = ['player', ...opponents.value.map(o => o.name)]
+  let cardIndex = 0
+  for (const player of players) {
+    const cardsPerPlayer = Math.floor(shuffled.length / players.length)
+    const startIndex = players.indexOf(player) * cardsPerPlayer
+    const endIndex = startIndex + cardsPerPlayer + (players.indexOf(player) < shuffled.length % players.length ? 1 : 0)
+    
+    if (player === 'player') {
+      playerHand.value = shuffled.slice(startIndex, endIndex)
+      sortHand(playerHand.value)
+    } else {
+      const opp = opponents.value.find(o => o.name === player)
+      if (opp) {
+        opp.hand = shuffled.slice(startIndex, endIndex)
+      }
+    }
+  }
+
+  gameMessage.value = {
+    text: 'CHAOS! All hands shuffled and redistributed!',
+    type: 'warning'
+  }
+  checkForBooks('player')
+  for (const opp of opponents.value) {
+    checkForBooks(opp.name)
+  }
+  return true
+}
+
+// Weighted action selector
+function selectChaosAction() {
+  const actions = [
+    { func: previewOpponentCard, weight: 15 },
+    { func: stealRandomCard, weight: 12 },
+    { func: drawExtraCards, weight: 12 },
+    { func: getBestRankHint, weight: 10 },
+    { func: revealRankAcrossHands, weight: 10 },
+    { func: giveRandomCard, weight: 8 },
+    { func: discardRandomCards, weight: 8 },
+    { func: forceOpponentDiscard, weight: 8 },
+    { func: swapHandsWithOpponent, weight: 5 },
+    { func: shuffleAllHands, weight: 2 }
+  ]
+
+  // Calculate total weight
+  const totalWeight = actions.reduce((sum, a) => sum + a.weight, 0)
+  let random = Math.random() * totalWeight
+
+  // Select action based on weight
+  for (const action of actions) {
+    random -= action.weight
+    if (random <= 0) {
+      return action.func
+    }
+  }
+
+  // Fallback to first action
+  return actions[0].func
+}
+
+function triggerCardGainAnimation(cards) {
+  // Store the current hand size before adding cards
+  lastHandSize.value = playerHand.value.length
+  
+  // Trigger screen celebration effect
+  cardGainAnimation.value = true
+  setTimeout(() => {
+    cardGainAnimation.value = false
+  }, 2000)
+  
+  // Add body class for screen effects
+  document.body.classList.add('card-gain-celebration')
+  setTimeout(() => {
+    document.body.classList.remove('card-gain-celebration')
+  }, 800)
+}
+
+function executeChaosAction() {
+  if (!chaosButtonAvailable.value) return
+
+  // Add visual chaos effect
+  document.body.classList.add('chaos-active')
+  setTimeout(() => {
+    document.body.classList.remove('chaos-active')
+  }, 1000)
+
+  // Try actions until one succeeds (with fallback)
+  const actionFunc = selectChaosAction()
+  let success = actionFunc()
+
+  // If action failed, try a safe fallback
+  if (!success) {
+    if (deck.value.length > 0) {
+      success = drawExtraCards()
+    } else if (playerHand.value.length > 0) {
+      success = getBestRankHint()
+    }
+  }
+
+  if (success) {
+    // Set cooldown to 2 turns
+    chaosButtonCooldown.value = 2
+    checkGameOver()
+  }
+}
+
 function startNewGame() {
   deck.value = createDeck()
   playerHand.value = []
@@ -379,8 +705,16 @@ function startNewGame() {
   selectedOpponent.value = null
   gameOver.value = false
   winner.value = null
+  chaosButtonCooldown.value = 0
+  previewedCard.value = null
+  cardGainAnimation.value = false
+  lastHandSize.value = 0
 
   dealCards()
+  // Set initial hand size after dealing
+  setTimeout(() => {
+    lastHandSize.value = playerHand.value.length
+  }, 100)
 }
 
 onMounted(() => {
@@ -433,6 +767,14 @@ onMounted(() => {
             <GameMessage :message="gameMessage.text" :type="gameMessage.type" />
           </div>
           <div class="center-content">
+            <div class="chaos-button-wrapper">
+              <ChaosButton
+                :available="chaosButtonAvailable"
+                :cooldown="chaosButtonCooldown"
+                :disabled="gameOver || currentTurn !== 'player'"
+                @activate="executeChaosAction"
+              />
+            </div>
             <DrawPile
               :cards-remaining="deck.length"
               :can-draw="canDrawCard"
@@ -491,6 +833,8 @@ onMounted(() => {
           <PlayerHand
             :cards="playerHand"
             :selected-card="selectedCard"
+            :card-gain-animation="cardGainAnimation"
+            :last-hand-size="lastHandSize"
             @select-card="selectCard"
           />
         </div>
@@ -543,6 +887,54 @@ onMounted(() => {
   box-sizing: border-box;
   position: relative;
   font-family: 'Press Start 2P', monospace;
+  transition: transform 0.3s ease;
+}
+
+/* Chaos effect when button is pressed */
+
+@keyframes chaosShake {
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  10% {
+    transform: translate(-10px, -5px) rotate(-2deg);
+  }
+  20% {
+    transform: translate(10px, 5px) rotate(2deg);
+  }
+  30% {
+    transform: translate(-8px, 3px) rotate(-1deg);
+  }
+  40% {
+    transform: translate(8px, -3px) rotate(1deg);
+  }
+  50% {
+    transform: translate(-5px, -2px) rotate(-0.5deg);
+  }
+  60% {
+    transform: translate(5px, 2px) rotate(0.5deg);
+  }
+  70% {
+    transform: translate(-3px, 1px) rotate(-0.3deg);
+  }
+  80% {
+    transform: translate(3px, -1px) rotate(0.3deg);
+  }
+  90% {
+    transform: translate(-2px, 0) rotate(-0.1deg);
+  }
+}
+
+@keyframes chaosWobble {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+  }
+  25% {
+    transform: scale(1.02) rotate(1deg);
+  }
+  75% {
+    transform: scale(0.98) rotate(-1deg);
+  }
 }
 
 .game-header {
@@ -653,6 +1045,14 @@ onMounted(() => {
   align-items: flex-start;
   justify-content: center;
   gap: 30px;
+  flex-wrap: wrap;
+}
+
+.chaos-button-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  order: -1; /* Place chaos button first (left of draw pile) */
 }
 
 .all-book-piles {
@@ -807,6 +1207,10 @@ onMounted(() => {
 
   .all-book-piles {
     grid-template-columns: repeat(4, 1fr);
+  }
+
+  .chaos-button-wrapper {
+    /* Already ordered first, no change needed */
   }
 }
 

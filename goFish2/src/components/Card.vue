@@ -21,6 +21,10 @@ defineProps({
   small: {
     type: Boolean,
     default: false
+  },
+  isNew: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -47,7 +51,8 @@ const getFishColor = (suit) => {
     :class="{
       'face-down': faceDown,
       'selected': selected,
-      'small': small
+      'small': small,
+      'new-card': isNew
     }"
     @click="$emit('click')"
   >
@@ -256,5 +261,40 @@ const getFishColor = (suit) => {
   left: 5px;
   right: 5px;
   bottom: 5px;
+}
+
+/* New card celebration effects */
+.card.new-card {
+  filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.8)) drop-shadow(0 0 25px rgba(255, 107, 53, 0.6));
+}
+
+.card.new-card .card-inner {
+  animation: cardGlow 1s ease-in-out;
+  box-shadow:
+    inset -2px -2px 0 #d4d0c4,
+    inset 2px 2px 0 #ffffff,
+    0 0 0 4px rgba(255, 215, 0, 0.6),
+    0 0 20px rgba(255, 215, 0, 0.8),
+    8px 10px 0 rgba(0, 0, 0, 0.4);
+}
+
+@keyframes cardGlow {
+  0%, 100% {
+    box-shadow:
+      inset -2px -2px 0 #d4d0c4,
+      inset 2px 2px 0 #ffffff,
+      0 0 0 4px rgba(255, 215, 0, 0.6),
+      0 0 20px rgba(255, 215, 0, 0.8),
+      8px 10px 0 rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    box-shadow:
+      inset -2px -2px 0 #d4d0c4,
+      inset 2px 2px 0 #ffffff,
+      0 0 0 6px rgba(255, 215, 0, 1),
+      0 0 40px rgba(255, 215, 0, 1),
+      0 0 60px rgba(255, 107, 53, 0.8),
+      12px 14px 0 rgba(0, 0, 0, 0.4);
+  }
 }
 </style>
