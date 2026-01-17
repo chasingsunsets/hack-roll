@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import PlayerHand from './PlayerHand.vue'
 import OpponentHand from './OpponentHand.vue'
 import DrawPile from './DrawPile.vue'
@@ -9,18 +9,31 @@ import AskRankModal from './AskRankModal.vue'
 import PixelBackground from './PixelBackground.vue'
 import PixelFish from './PixelFish.vue'
 import ChaosButton from './ChaosButton.vue'
+import GoFishSplash from './GoFishSplash.vue'
+import BookCompleteEffect from './BookCompleteEffect.vue'
+
+// Camera & Gesture Detection
+import CameraFeed from './camera/CameraFeed.vue'
+import CameraPermission from './camera/CameraPermission.vue'
+import MyBannedMoveHint from './banned-moves/MyBannedMoveHint.vue'
+import BannedMoveAlert from './banned-moves/BannedMoveAlert.vue'
+import DebugPanel from './banned-moves/DebugPanel.vue'
+import { useCamera } from '../composables/useCamera'
+import { useGestureDetection } from '../composables/useGestureDetection'
+import { BANNED_MOVES } from '../services/gestureDefinitions'
 
 // Constants
 const SUITS = ['♠', '♥', '♦', '♣']
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
+const BANNED_MOVE_KEYS = Object.keys(BANNED_MOVES)
 
 // Game state
 const deck = ref([])
 const playerHand = ref([])
 const opponents = ref([
-  { name: 'Bot 1', hand: [], books: [] },
-  { name: 'Bot 2', hand: [], books: [] },
-  { name: 'Bot 3', hand: [], books: [] }
+  { name: 'Bot 1', hand: [], books: [], bannedMove: null },
+  { name: 'Bot 2', hand: [], books: [], bannedMove: null },
+  { name: 'Bot 3', hand: [], books: [], bannedMove: null }
 ])
 const playerBooks = ref([])
 const currentTurn = ref('player') // 'player' or opponent name
@@ -39,6 +52,23 @@ const previewedCard = ref(null) // For preview actions
 // Card gain animation state
 const cardGainAnimation = ref(false)
 const lastHandSize = ref(0)
+
+// Visual effects state
+const showGoFishSplash = ref(false)
+const showBookComplete = ref(false)
+const completedBookRank = ref('')
+const bookCompletePosition = ref({ x: 50, y: 50 })
+
+// Camera & Gesture state
+const { stream, isEnabled: cameraEnabled, error: cameraError, isLoading: cameraLoading, startCamera, stopCamera } = useCamera()
+const { isReady: gestureReady, isLoading: gestureLoading, currentGestures, initialize: initGesture, startDetection, stopDetection } = useGestureDetection()
+const cameraFeedRef = ref(null)
+const showCameraPermission = ref(false)
+const showCameraFeed = ref(false) // Controls camera feed visibility
+const playerBannedMove = ref(null)
+const showBannedMoveAlert = ref(false)
+const currentPenalty = ref(null)
+const debugMode = ref(false)
 
 // Computed
 const playerRanks = computed(() => {
@@ -69,6 +99,150 @@ const chaosButtonAvailable = computed(() =>
   currentTurn.value === 'player' &&
   !gameOver.value
 )
+
+// Computed for debug panel
+const otherPlayersForDebug = computed(() =>
+  opponents.value.map(o => ({ id: o.name, name: o.name }))
+)
+
+const otherPlayersMoves = computed(() => {
+  const moves = {}
+  opponents.value.forEach(o => {
+    moves[o.name] = { bannedMove: o.bannedMove }
+  })
+  return moves
+})
+
+// Camera & Gesture Functions
+function assignBannedMoves() {
+  // Assign random banned move to player
+  playerBannedMove.value = BANNED_MOVE_KEYS[Math.floor(Math.random() * BANNED_MOVE_KEYS.length)]
+
+  // Assign random banned moves to opponents
+  opponents.value.forEach(opp => {
+    opp.bannedMove = BANNED_MOVE_KEYS[Math.floor(Math.random() * BANNED_MOVE_KEYS.length)]
+  })
+}
+
+async function enableCamera() {
+  showCameraPermission.value = false
+  showCameraFeed.value = true // Show camera feed first
+
+  // Initialize gesture detection
+  await initGesture()
+
+  // Wait for the CameraFeed component to mount
+  await new Promise(resolve => setTimeout(resolve, 200))
+
+  if (cameraFeedRef.value) {
+    const videoEl = cameraFeedRef.value.getVideoElement()
+    await startCamera(videoEl)
+
+    // Start gesture detection
+    if (gestureReady.value && cameraEnabled.value) {
+      startDetection(videoEl, onGestureDetected)
+    }
+  }
+}
+
+function disableCamera() {
+  stopDetection()
+  stopCamera()
+  showCameraFeed.value = false
+}
+
+function toggleCamera() {
+  if (showCameraFeed.value) {
+    disableCamera()
+  } else {
+    showCameraPermission.value = true
+  }
+}
+
+function onCameraPermissionGranted() {
+  enableCamera()
+}
+
+function onCameraPermissionDenied() {
+  showCameraPermission.value = false
+}
+
+function onGestureDetected(gesture) {
+  // Check if player is doing their own banned move (bots catch them!)
+  if (playerBannedMove.value === gesture.type) {
+    // Player got caught by a bot!
+    const catchingBot = opponents.value[Math.floor(Math.random() * opponents.value.length)]
+    currentPenalty.value = {
+      gestureType: gesture.type,
+      gestureName: BANNED_MOVES[gesture.type]?.name,
+      victimName: 'You',
+      reporterName: catchingBot.name,
+      penalties: [{ penaltyType: 'SKIP_TURN' }]
+    }
+    showBannedMoveAlert.value = true
+
+    gameMessage.value = {
+      text: `${catchingBot.name} caught YOU doing ${BANNED_MOVES[gesture.type]?.name}!`,
+      type: 'warning'
+    }
+    return
+  }
+
+  // Check if detected gesture matches any opponent's banned move
+  for (const opp of opponents.value) {
+    if (opp.bannedMove === gesture.type) {
+      // Caught an opponent!
+      currentPenalty.value = {
+        gestureType: gesture.type,
+        gestureName: BANNED_MOVES[gesture.type]?.name,
+        victimName: opp.name,
+        reporterName: 'You',
+        penalties: [{ penaltyType: 'SKIP_TURN' }]
+      }
+      showBannedMoveAlert.value = true
+
+      gameMessage.value = {
+        text: `You caught ${opp.name} doing ${BANNED_MOVES[gesture.type]?.name}!`,
+        type: 'success'
+      }
+      break
+    }
+  }
+}
+
+function onBannedMoveAlertClose() {
+  showBannedMoveAlert.value = false
+  currentPenalty.value = null
+}
+
+function toggleDebugMode() {
+  debugMode.value = !debugMode.value
+}
+
+function onSimulateGesture(playerId, gestureType) {
+  // Simulate a gesture detection for testing
+  const opp = opponents.value.find(o => o.name === playerId)
+  if (opp && opp.bannedMove === gestureType) {
+    currentPenalty.value = {
+      gestureType: gestureType,
+      gestureName: BANNED_MOVES[gestureType]?.name,
+      victimName: opp.name,
+      reporterName: 'You',
+      penalties: [{ penaltyType: 'SKIP_TURN' }]
+    }
+    showBannedMoveAlert.value = true
+
+    gameMessage.value = {
+      text: `You caught ${opp.name} doing ${BANNED_MOVES[gestureType]?.name}!`,
+      type: 'success'
+    }
+  } else {
+    gameMessage.value = {
+      text: `Wrong! ${opp?.name || 'Unknown'}'s banned move is not ${BANNED_MOVES[gestureType]?.name}.`,
+      type: 'warning'
+    }
+  }
+}
 
 // Functions
 function createDeck() {
@@ -186,7 +360,8 @@ function askForCards(opponentName, rank) {
       }
     }, 1500)
   } else {
-    // Go Fish!
+    // Go Fish! - Show splash effect
+    showGoFishSplash.value = true
     gameMessage.value = {
       text: `Go Fish! ${opponentName} doesn't have any ${rank}s.`,
       type: 'warning'
@@ -195,6 +370,10 @@ function askForCards(opponentName, rank) {
     selectedRank.value = null
     selectedOpponent.value = null
   }
+}
+
+function onGoFishSplashComplete() {
+  showGoFishSplash.value = false
 }
 
 function drawCard() {
@@ -228,7 +407,13 @@ function checkForBooks(playerType) {
 
   if (playerType === 'player') {
     hand = playerHand
-    addBook = (rank) => playerBooks.value.push({ rank })
+    addBook = (rank) => {
+      playerBooks.value.push({ rank })
+      // Show book complete effect
+      completedBookRank.value = rank
+      bookCompletePosition.value = { x: 50, y: 60 }
+      showBookComplete.value = true
+    }
   } else {
     const opponent = opponents.value.find(o => o.name === playerType)
     hand = { value: opponent.hand }
@@ -261,6 +446,10 @@ function checkForBooks(playerType) {
   }
 
   checkGameOver()
+}
+
+function onBookCompleteEffectDone() {
+  showBookComplete.value = false
 }
 
 function nextTurn() {
@@ -693,9 +882,9 @@ function startNewGame() {
   playerHand.value = []
   playerBooks.value = []
   opponents.value = [
-    { name: 'Bot 1', hand: [], books: [] },
-    { name: 'Bot 2', hand: [], books: [] },
-    { name: 'Bot 3', hand: [], books: [] }
+    { name: 'Bot 1', hand: [], books: [], bannedMove: null },
+    { name: 'Bot 2', hand: [], books: [], bannedMove: null },
+    { name: 'Bot 3', hand: [], books: [], bannedMove: null }
   ]
   currentTurn.value = 'player'
   selectedCard.value = null
@@ -709,6 +898,13 @@ function startNewGame() {
   previewedCard.value = null
   cardGainAnimation.value = false
   lastHandSize.value = 0
+  showGoFishSplash.value = false
+  showBookComplete.value = false
+  showBannedMoveAlert.value = false
+  currentPenalty.value = null
+
+  // Assign banned moves for this game
+  assignBannedMoves()
 
   dealCards()
   // Set initial hand size after dealing
@@ -720,6 +916,10 @@ function startNewGame() {
 onMounted(() => {
   startNewGame()
 })
+
+onUnmounted(() => {
+  disableCamera()
+})
 </script>
 
 <template>
@@ -727,14 +927,54 @@ onMounted(() => {
     <!-- Pixel Background -->
     <PixelBackground />
 
+    <!-- Visual Effects -->
+    <GoFishSplash :show="showGoFishSplash" @complete="onGoFishSplashComplete" />
+    <BookCompleteEffect
+      :show="showBookComplete"
+      :rank="completedBookRank"
+      :position="bookCompletePosition"
+      @complete="onBookCompleteEffectDone"
+    />
+
+    <!-- Camera Permission Modal -->
+    <CameraPermission
+      v-if="showCameraPermission"
+      @granted="onCameraPermissionGranted"
+      @denied="onCameraPermissionDenied"
+    />
+
+    <!-- Banned Move Alert -->
+    <BannedMoveAlert
+      v-if="showBannedMoveAlert && currentPenalty"
+      :penalty="currentPenalty"
+      @close="onBannedMoveAlertClose"
+    />
+
+    <!-- Camera Feed (bottom right) -->
+    <CameraFeed
+      v-if="showCameraFeed"
+      ref="cameraFeedRef"
+      :is-detecting="gestureReady && cameraEnabled"
+      :current-gestures="currentGestures"
+      :stream="stream"
+    />
+
     <!-- Header -->
     <div class="game-header">
       <div class="title-container">
         <PixelFish :size="48" color="gold" />
-        <h1 class="game-title">GO FISH!</h1>
+        <h1 class="game-title pixel-title">GO FISH!</h1>
         <PixelFish :size="48" color="blue" />
       </div>
-      <button class="new-game-btn pixel-btn" @click="startNewGame">NEW GAME</button>
+      <div class="header-buttons">
+        <button class="camera-btn pixel-btn" @click="toggleCamera" :class="{ active: showCameraFeed }">
+          {{ showCameraFeed ? 'CAM ON' : 'CAM OFF' }}
+        </button>
+        <button class="debug-btn pixel-btn" @click="toggleDebugMode" :class="{ active: debugMode }">
+          DEBUG
+        </button>
+        <button class="new-game-btn pixel-btn" @click="startNewGame">NEW GAME</button>
+      </div>
     </div>
 
     <!-- Main game area - Card table layout -->
@@ -854,6 +1094,15 @@ onMounted(() => {
       @cancel="cancelAsk"
     />
 
+    <!-- Debug Panel -->
+    <div v-if="debugMode" class="debug-panel-container">
+      <DebugPanel
+        :other-players="otherPlayersForDebug"
+        :other-players-moves="otherPlayersMoves"
+        @simulate="onSimulateGesture"
+      />
+    </div>
+
     <!-- Game over overlay -->
     <div v-if="gameOver" class="game-over-overlay">
       <div class="game-over-content pixel-panel">
@@ -879,8 +1128,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-
 .game-board {
   min-height: 100vh;
   padding: 20px;
@@ -966,39 +1213,6 @@ onMounted(() => {
     4px 4px 0 #cc8800,
     -2px -2px 0 #ffee88;
   letter-spacing: 4px;
-}
-
-/* Pixel button style */
-.pixel-btn {
-  padding: 12px 24px;
-  background: #ff6b35;
-  border: none;
-  color: white;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 0.7rem;
-  cursor: pointer;
-  position: relative;
-  box-shadow:
-    inset -4px -4px 0 #cc4a1a,
-    inset 4px 4px 0 #ff9a6c,
-    6px 6px 0 rgba(0, 0, 0, 0.4);
-  transition: all 0.1s ease;
-}
-
-.pixel-btn:hover {
-  transform: translate(2px, 2px);
-  box-shadow:
-    inset -4px -4px 0 #cc4a1a,
-    inset 4px 4px 0 #ff9a6c,
-    4px 4px 0 rgba(0, 0, 0, 0.4);
-}
-
-.pixel-btn:active {
-  transform: translate(4px, 4px);
-  box-shadow:
-    inset -4px -4px 0 #cc4a1a,
-    inset 4px 4px 0 #ff9a6c,
-    2px 2px 0 rgba(0, 0, 0, 0.4);
 }
 
 /* Card table layout */
@@ -1130,16 +1344,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  animation: fadeIn 0.3s ease;
-}
-
-.pixel-panel {
-  background: #1a3a5c;
-  border: 6px solid #ffd700;
-  box-shadow:
-    inset -6px -6px 0 #0d2847,
-    inset 6px 6px 0 #2a5a8c,
-    12px 12px 0 rgba(0, 0, 0, 0.5);
+  animation: fadeIn 0.3s steps(4);
 }
 
 .game-over-content {
@@ -1150,7 +1355,7 @@ onMounted(() => {
 
 .trophy-fish {
   margin-bottom: 20px;
-  animation: bounce 1s ease-in-out infinite;
+  animation: bounce 1s steps(4) infinite;
 }
 
 @keyframes bounce {
@@ -1246,6 +1451,66 @@ onMounted(() => {
 
   .all-book-piles {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Header buttons */
+.header-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.camera-btn,
+.debug-btn {
+  font-size: 0.5rem;
+  padding: 8px 12px;
+}
+
+.camera-btn.active {
+  background: #5dfc9a;
+  color: #0a1628;
+}
+
+.debug-btn.active {
+  background: #4fc3f7;
+  color: #0a1628;
+}
+
+/* Banned move panel */
+.banned-move-panel {
+  position: fixed;
+  top: 100px;
+  left: 16px;
+  z-index: 30;
+  max-width: 280px;
+}
+
+/* Debug panel container */
+.debug-panel-container {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 35;
+  max-width: 350px;
+}
+
+@media (max-width: 900px) {
+  .banned-move-panel {
+    position: static;
+    max-width: 100%;
+    margin: 10px 0;
+  }
+
+  .debug-panel-container {
+    position: static;
+    max-width: 100%;
+    margin: 10px 0;
+  }
+
+  .header-buttons {
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 }
 </style>

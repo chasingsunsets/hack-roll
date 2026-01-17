@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(findstr:*)",
+      "Bash(dir \"C:\\\\Users\\\\sidha\\\\Code\\\\Projects\" /b)",
+      "Bash(npm install:*)",
+      "Bash(curl:*)",
+      "Bash(node server.js:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(git add:*)",
+      "Bash(git reset:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(git merge:*)"
+    ]
+  }
+}
