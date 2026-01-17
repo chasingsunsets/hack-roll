@@ -140,12 +140,6 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
         <span class="count-label">CARDS</span>
       </div>
     </div>
-
-    <!-- Draw prompt (positioned outside to avoid overlap) -->
-    <div v-if="canDraw && !isFishing && cardsRemaining > 0" class="draw-prompt">
-      <PixelFish :size="20" color="gold" class="prompt-fish" />
-      <span>GO FISH!</span>
-    </div>
   </div>
 </template>
 

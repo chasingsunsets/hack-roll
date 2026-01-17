@@ -1,6 +1,8 @@
 <script setup>
 import Card from './Card.vue'
 import PixelFish from './PixelFish.vue'
+import PixelShark from './PixelShark.vue'
+import PlayerCameraFeed from './camera/PlayerCameraFeed.vue'
 
 defineProps({
   cardCount: {
@@ -30,6 +32,14 @@ defineProps({
   isSelectable: {
     type: Boolean,
     default: false
+  },
+  cameraStream: {
+    type: MediaStream,
+    default: null
+  },
+  showCamera: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -43,50 +53,69 @@ function handleClick() {
 </script>
 
 <template>
-  <div 
-    class="opponent-hand pixel-panel" 
-    :class="[position, { 'current-turn': isCurrentTurn, 'selected': isSelected, 'selectable': isSelectable }]"
-    @click="handleClick"
-  >
-    <div class="opponent-info">
-      <div class="avatar">
-        <PixelFish :size="24" :color="fishColors[name] || 'blue'" />
+  <div class="opponent-container">
+    <div
+      class="opponent-hand pixel-panel"
+      :class="[position, { 'current-turn': isCurrentTurn, 'selected': isSelected, 'selectable': isSelectable }]"
+      @click="handleClick"
+    >
+      <div class="opponent-info">
+        <div class="avatar">
+          <PixelShark :size="28" color="blue" />
+        </div>
+        <div class="name-and-count">
+          <span class="name">{{ name }}</span>
+          <span class="card-count">{{ cardCount }}</span>
+        </div>
       </div>
-      <span class="name">{{ name }}</span>
-      <span class="card-count">{{ cardCount }}</span>
+      <div class="cards-container" :class="position">
+        <template v-if="cards.length > 0">
+          <Card
+            v-for="(card, i) in cards.slice(0, 7)"
+            :key="i"
+            :suit="card.suit"
+            :rank="card.rank"
+            :face-down="true"
+            :small="true"
+            class="opponent-card"
+            :style="{ '--card-index': i + 1 }"
+          />
+        </template>
+        <template v-else>
+          <Card
+            v-for="i in Math.min(cardCount, 7)"
+            :key="i"
+            suit="♠"
+            rank="A"
+            :face-down="true"
+            :small="true"
+            class="opponent-card"
+            :style="{ '--card-index': i }"
+          />
+        </template>
+        <div v-if="cardCount > 7" class="extra-cards">+{{ cardCount - 7 }}</div>
+      </div>
     </div>
-    <div class="cards-container" :class="position">
-      <template v-if="cards.length > 0">
-        <Card
-          v-for="(card, i) in cards.slice(0, 7)"
-          :key="i"
-          :suit="card.suit"
-          :rank="card.rank"
-          :face-down="true"
-          :small="true"
-          class="opponent-card"
-          :style="{ '--card-index': i + 1 }"
-        />
-      </template>
-      <template v-else>
-        <Card
-          v-for="i in Math.min(cardCount, 7)"
-          :key="i"
-          suit="♠"
-          rank="A"
-          :face-down="true"
-          :small="true"
-          class="opponent-card"
-          :style="{ '--card-index': i }"
-        />
-      </template>
-      <div v-if="cardCount > 7" class="extra-cards">+{{ cardCount - 7 }}</div>
-    </div>
+    <!-- Camera feed outside the yellow box -->
+    <PlayerCameraFeed
+      v-if="showCamera && cameraStream"
+      :stream="cameraStream"
+      :player-name="name"
+      :is-local="false"
+      size="large"
+      class="opponent-camera-external"
+    />
   </div>
 </template>
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+.opponent-container {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
 
 .opponent-hand {
   display: flex;
@@ -147,6 +176,12 @@ function handleClick() {
   justify-content: center;
 }
 
+.name-and-count {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .name {
   font-size: 0.55rem;
   color: #fff;
@@ -158,12 +193,17 @@ function handleClick() {
   background: rgba(0, 0, 0, 0.4);
   padding: 3px 8px;
   border: 2px solid #4fc3f7;
+  text-align: center;
 }
 
 .cards-container {
   display: flex;
   justify-content: center;
   position: relative;
+}
+
+.opponent-camera-external {
+  flex-shrink: 0;
 }
 
 .cards-container.top .opponent-card {

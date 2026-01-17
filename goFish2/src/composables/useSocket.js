@@ -31,6 +31,10 @@ let onPlayerDisconnected = null;
 let onPlayerRejoined = null;
 let onTurnChanged = null;
 let onTurnSkipped = null;
+let onOctopusTroll = null;
+let onDeckSwapTroll = null;
+let onGameStateUpdate = null;
+let onEarthquakeTroll = null;
 
 export function useSocket() {
   // Load session from localStorage
@@ -170,6 +174,25 @@ export function useSocket() {
     socket.value.on('turn-skipped', (data) => {
       onTurnSkipped?.(data);
     });
+
+    socket.value.on('octopus-troll', (data) => {
+      onOctopusTroll?.(data);
+    });
+
+    socket.value.on('deck-swap-troll', (data) => {
+      onDeckSwapTroll?.(data);
+    });
+
+    socket.value.on('game-state-update', (data) => {
+      players.value = data.players;
+      hand.value = data.hand;
+      deckCount.value = data.deckCount;
+      onGameStateUpdate?.(data);
+    });
+
+    socket.value.on('earthquake-troll', (data) => {
+      onEarthquakeTroll?.(data);
+    });
   }
 
   function disconnect() {
@@ -289,6 +312,10 @@ export function useSocket() {
     onPlayerRejoined = handlers.onPlayerRejoined;
     onTurnChanged = handlers.onTurnChanged;
     onTurnSkipped = handlers.onTurnSkipped;
+    onOctopusTroll = handlers.onOctopusTroll;
+    onDeckSwapTroll = handlers.onDeckSwapTroll;
+    onGameStateUpdate = handlers.onGameStateUpdate;
+    onEarthquakeTroll = handlers.onEarthquakeTroll;
   }
 
   // Check if we have an existing session
