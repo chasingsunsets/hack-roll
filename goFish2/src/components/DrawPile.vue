@@ -42,19 +42,6 @@ defineEmits(['draw'])
         <span class="pile-count">{{ cardsRemaining }}</span>
       </div>
     </div>
-    <div v-if="canDraw" class="draw-hint">
-      <PixelFish :size="20" color="gold" class="hint-fish" />
-      <span>GO FISH!</span>
-      <div class="hint-arrow">
-        <svg width="12" height="12" viewBox="0 0 12 12">
-          <rect x="5" y="0" width="2" height="8" fill="currentColor"/>
-          <rect x="3" y="6" width="2" height="2" fill="currentColor"/>
-          <rect x="7" y="6" width="2" height="2" fill="currentColor"/>
-          <rect x="1" y="8" width="2" height="2" fill="currentColor"/>
-          <rect x="9" y="8" width="2" height="2" fill="currentColor"/>
-        </svg>
-      </div>
-    </div>
   </div>
 </template>
 

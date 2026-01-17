@@ -8,7 +8,6 @@ import GameMessage from './GameMessage.vue'
 import AskRankModal from './AskRankModal.vue'
 import PixelBackground from './PixelBackground.vue'
 import PixelFish from './PixelFish.vue'
-import ChaosButton from './ChaosButton.vue'
 import GoFishSplash from './GoFishSplash.vue'
 import BookCompleteEffect from './BookCompleteEffect.vue'
 
