@@ -7,6 +7,10 @@ defineProps({
     type: Number,
     required: true
   },
+  cards: {
+    type: Array,
+    default: () => []
+  },
   name: {
     type: String,
     default: 'Opponent'
@@ -34,16 +38,30 @@ const fishColors = { 'Bot 1': 'blue', 'Bot 2': 'green', 'Bot 3': 'pink' }
       <span class="card-count">{{ cardCount }}</span>
     </div>
     <div class="cards-container" :class="position">
-      <Card
-        v-for="i in Math.min(cardCount, 7)"
-        :key="i"
-        suit="♠"
-        rank="A"
-        :face-down="true"
-        :small="true"
-        class="opponent-card"
-        :style="{ '--card-index': i }"
-      />
+      <template v-if="cards.length > 0">
+        <Card
+          v-for="(card, i) in cards.slice(0, 7)"
+          :key="i"
+          :suit="card.suit"
+          :rank="card.rank"
+          :face-down="true"
+          :small="true"
+          class="opponent-card"
+          :style="{ '--card-index': i + 1 }"
+        />
+      </template>
+      <template v-else>
+        <Card
+          v-for="i in Math.min(cardCount, 7)"
+          :key="i"
+          suit="♠"
+          rank="A"
+          :face-down="true"
+          :small="true"
+          class="opponent-card"
+          :style="{ '--card-index': i }"
+        />
+      </template>
       <div v-if="cardCount > 7" class="extra-cards">+{{ cardCount - 7 }}</div>
     </div>
   </div>

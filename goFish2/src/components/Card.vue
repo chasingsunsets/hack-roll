@@ -1,6 +1,12 @@
 <script setup>
+import { ref, onMounted, onUnmounted } from 'vue'
 import PixelFish from './PixelFish.vue'
 import PixelSuit from './PixelSuit.vue'
+import { useTurbulence } from '../composables/useTurbulence'
+
+const { turbulenceActive } = useTurbulence()
+const turbulenceFlipped = ref(false)
+let flipTimeout = null
 
 defineProps({
   suit: {
@@ -64,21 +70,42 @@ const getFishColor = (suit) => {
 }
 
 const getSuitName = (suit) => suitToFish[suit] || 'coral'
+
+// Watch for turbulence - flip all cards face-up
+onMounted(() => {
+  const checkTurbulence = setInterval(() => {
+    if (turbulenceActive.value && !turbulenceFlipped.value) {
+      // Flip all cards during turbulence
+      turbulenceFlipped.value = true
+    } else if (!turbulenceActive.value && turbulenceFlipped.value) {
+      // Return to normal when turbulence ends
+      turbulenceFlipped.value = false
+    }
+  }, 100)
+
+  onUnmounted(() => {
+    clearInterval(checkTurbulence)
+    if (flipTimeout) {
+      clearTimeout(flipTimeout)
+    }
+  })
+})
 </script>
 
 <template>
   <div
     class="card pixel-card"
     :class="{
-      'face-down': faceDown,
+      'face-down': faceDown && !turbulenceFlipped,
       'selected': selected,
       'small': small,
       'new-card': isNew,
-      'animated': animated
+      'animated': animated,
+      'turbulence-flip': turbulenceFlipped
     }"
     @click="$emit('click')"
   >
-    <template v-if="!faceDown">
+    <template v-if="!faceDown || turbulenceFlipped">
       <div class="card-inner">
         <!-- Top left corner -->
         <div class="card-corner top-left">
@@ -561,5 +588,58 @@ const getSuitName = (suit) => suitToFish[suit] || 'coral'
     transform: translate(0, 0) scale(1);
     opacity: 1;
   }
+}
+
+/* Turbulence flip animation */
+.card.turbulence-flip {
+  animation: turbulence-flip 1s ease-in-out;
+  z-index: 100 !important;
+  transform-style: preserve-3d;
+}
+
+@keyframes turbulence-flip {
+  0% {
+    transform: rotateY(0deg) translateY(0) scale(1);
+  }
+  25% {
+    transform: rotateY(90deg) translateY(-15px) scale(1.1);
+  }
+  50% {
+    transform: rotateY(180deg) translateY(-20px) scale(1.15);
+  }
+  75% {
+    transform: rotateY(270deg) translateY(-15px) scale(1.1);
+  }
+  100% {
+    transform: rotateY(360deg) translateY(0) scale(1);
+  }
+}
+
+/* Make turbulence flip more dramatic during active state */
+.card.turbulence-flip.face-down .card-back {
+  animation: card-wobble 1s ease-in-out infinite;
+}
+
+@keyframes card-wobble {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-3deg);
+  }
+  75% {
+    transform: rotate(3deg);
+  }
+}
+
+/* Add glowing effect during turbulence flip */
+.card.turbulence-flip .card-inner,
+.card.turbulence-flip .card-back {
+  box-shadow:
+    inset -3px -3px 0 rgba(0, 0, 0, 0.2),
+    inset 3px 3px 0 rgba(255, 255, 255, 0.2),
+    0 0 20px rgba(79, 195, 247, 0.6),
+    0 0 40px rgba(79, 195, 247, 0.4),
+    4px 4px 0 rgba(0, 0, 0, 0.3);
 }
 </style>
