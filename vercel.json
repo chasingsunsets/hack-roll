@@ -2,5 +2,14 @@
   "buildCommand": "cd goFish2 && npm install && npm run build",
   "outputDirectory": "goFish2/dist",
   "framework": null,
-  "installCommand": "cd goFish2 && npm install"
+  "installCommand": "cd goFish2 && npm install",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "env": {
+    "VITE_SERVER_URL": "@vite_server_url"
+  }
 }

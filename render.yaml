@@ -5,7 +5,14 @@ services:
     rootDir: server
     buildCommand: npm install
     startCommand: npm start
+    plan: free
+    healthCheckPath: /health
     envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
       - key: CLIENT_URL
         sync: false
         # Add your Vercel URL here after frontend deployment
+        # Example: https://your-app.vercel.app
