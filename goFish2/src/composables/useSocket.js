@@ -76,7 +76,8 @@ export function useSocket() {
     // Load existing session
     loadSession();
 
-    socket.value = io('http://localhost:3001');
+    const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+    socket.value = io(serverUrl);
 
     socket.value.on('connect', () => {
       connected.value = true;

@@ -7,9 +7,20 @@ const app = express();
 app.use(cors());
 
 const server = createServer(app);
+
+// Allow localhost for development and environment variable for production
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
+  "http://localhost:5176",
+  "http://localhost:5177",
+  ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : [])
+];
+
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176", "http://localhost:5177"],
+    origin: allowedOrigins,
     methods: ["GET", "POST"]
   }
 });

@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd goFish2 && npm install && npm run build",
+  "outputDirectory": "goFish2/dist",
+  "framework": null,
+  "installCommand": "cd goFish2 && npm install"
+}

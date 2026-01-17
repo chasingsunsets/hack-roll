@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: gofish-server
+    runtime: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: CLIENT_URL
+        sync: false
+        # Add your Vercel URL here after frontend deployment
