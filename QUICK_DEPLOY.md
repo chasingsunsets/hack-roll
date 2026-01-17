@@ -36,7 +36,7 @@
 
 ---
 
-## 2. Deploy Frontend (Vercel) - 3 minutes
+## 2. Deploy Frontend (Vercel) - 3 minutes hi
 
 ### Sign up and deploy
 1. Go to [vercel.com](https://vercel.com) → Sign in with GitHub
