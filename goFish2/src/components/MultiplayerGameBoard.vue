@@ -40,6 +40,7 @@ const {
   gameOver,
   winner,
   myId,
+  myBannedMove,
   askForCards,
   drawCard,
   reportBannedMove,
@@ -281,17 +282,66 @@ async function enableCamera() {
   showCameraPermission.value = false
   showCameraFeed.value = true
 
+  console.log('Enabling camera...')
   await initGesture()
+  console.log('Gesture initialized, gestureReady:', gestureReady.value)
+
   await new Promise(resolve => setTimeout(resolve, 200))
 
   if (cameraFeedRef.value) {
     const videoEl = cameraFeedRef.value.getVideoElement()
+    console.log('Got video element:', videoEl)
     await startCamera(videoEl)
+    console.log('Camera started, cameraEnabled:', cameraEnabled.value)
+
+    // Wait for video to have actual frame data before starting detection
+    await waitForVideoReady(videoEl)
+    console.log('Video ready, dimensions:', videoEl.videoWidth, 'x', videoEl.videoHeight)
 
     if (gestureReady.value && cameraEnabled.value) {
+      console.log('Starting gesture detection...')
       startDetection(videoEl, onGestureDetected)
+    } else {
+      console.log('Cannot start detection - gestureReady:', gestureReady.value, 'cameraEnabled:', cameraEnabled.value)
     }
+  } else {
+    console.log('No camera feed ref!')
   }
+}
+
+// Helper to wait for video to have valid frame data
+function waitForVideoReady(videoEl) {
+  return new Promise((resolve) => {
+    if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+      resolve()
+      return
+    }
+
+    const checkReady = () => {
+      if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+        videoEl.removeEventListener('loadeddata', checkReady)
+        resolve()
+      }
+    }
+
+    videoEl.addEventListener('loadeddata', checkReady)
+
+    // Also check periodically in case event was missed
+    const interval = setInterval(() => {
+      if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+        clearInterval(interval)
+        videoEl.removeEventListener('loadeddata', checkReady)
+        resolve()
+      }
+    }, 100)
+
+    // Timeout after 5 seconds
+    setTimeout(() => {
+      clearInterval(interval)
+      videoEl.removeEventListener('loadeddata', checkReady)
+      resolve() // Resolve anyway to not block forever
+    }, 5000)
+  })
 }
 
 function disableCamera() {
@@ -317,9 +367,13 @@ function onCameraPermissionDenied() {
 }
 
 async function onGestureDetected(gesture) {
+  console.log('Gesture detected:', gesture.type, 'confidence:', gesture.confidence)
+
   // Report detected gesture to server - server will check if it matches
   // the LOCAL player's banned move (since camera watches the local player)
   const result = await reportGesture(gesture.type)
+  console.log('Server response:', result)
+
   if (result.caught) {
     console.log(`You got caught doing your banned move by ${result.catcherName}!`)
     // Alert will be shown via socket event 'banned-move-caught'
@@ -434,6 +488,9 @@ function handleLeaveGame() {
             <span class="player-name">YOUR HAND</span>
             <span class="card-count-badge">{{ hand.length }} cards</span>
             <span v-if="isMyTurn" class="turn-indicator">YOUR TURN!</span>
+            <span v-if="myBannedMove" class="banned-move-badge" :title="'Don\'t do this!'">
+              AVOID: {{ BANNED_MOVES[myBannedMove]?.name || myBannedMove }}
+            </span>
           </div>
           <PlayerHand
             :cards="hand"
@@ -635,6 +692,15 @@ function handleLeaveGame() {
   padding: 6px 12px;
   font-size: 0.5rem;
   animation: pulse 1s ease-in-out infinite;
+}
+
+.banned-move-badge {
+  background: #ff4444;
+  color: #fff;
+  padding: 6px 12px;
+  font-size: 0.45rem;
+  border: 2px solid #ff6666;
+  animation: pulse 2s ease-in-out infinite;
 }
 
 @keyframes pulse {

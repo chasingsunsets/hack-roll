@@ -14,7 +14,7 @@ export function useGestureDetection() {
 
   // Gesture confirmation state
   const gestureConfirmation = {};
-  const CONFIRMATION_FRAMES = 5;
+  const CONFIRMATION_FRAMES = 6; // Require sustained gesture
   const COOLDOWN_MS = 3000;
   const gestureLastTriggered = {};
 
@@ -118,17 +118,31 @@ export function useGestureDetection() {
     const forehead = faceLandmarks[10];
     const chin = faceLandmarks[152];
 
+    // Additional landmarks for better head pose detection
+    const leftCheek = faceLandmarks[234];   // Left face edge
+    const rightCheek = faceLandmarks[454];  // Right face edge
+    const noseBridge = faceLandmarks[6];    // Bridge of nose (between eyes)
+
     const eyeCenter = {
       x: (leftEye.x + rightEye.x) / 2,
       y: (leftEye.y + rightEye.y) / 2
     };
 
-    // LOOK_AWAY detection
-    const noseOffset = Math.abs(nose.x - eyeCenter.x);
-    if (noseOffset > 0.05) {
+    // LOOK_AWAY detection - simple and strict, only triggers on obvious head turns
+    // Compare distances from nose to each cheek - when head turns, one side compresses
+    const noseToLeftCheek = Math.abs(nose.x - leftCheek.x);
+    const noseToRightCheek = Math.abs(nose.x - rightCheek.x);
+    const cheekRatio = Math.min(noseToLeftCheek, noseToRightCheek) /
+                       Math.max(noseToLeftCheek, noseToRightCheek);
+
+    // Only trigger if head is REALLY turned (ratio < 0.35 means ~45+ degree turn)
+    // Normal looking straight: ratio ~0.8-1.0
+    // Slight turn: ratio ~0.5-0.7
+    // Obvious turn: ratio < 0.35
+    if (cheekRatio < 0.35) {
       gestures.push({
         type: 'LOOK_AWAY',
-        confidence: Math.min(noseOffset * 10, 1.0)
+        confidence: Math.min((0.35 - cheekRatio) * 4, 1.0)
       });
     }
 

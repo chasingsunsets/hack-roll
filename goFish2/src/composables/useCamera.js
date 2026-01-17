@@ -28,7 +28,15 @@ export function useCamera() {
 
       if (videoEl) {
         videoEl.srcObject = stream.value;
-        await videoEl.play();
+        try {
+          await videoEl.play();
+        } catch (playError) {
+          // Ignore AbortError - video might already be playing via autoplay
+          if (playError.name !== 'AbortError') {
+            throw playError;
+          }
+          console.log('Play interrupted (likely already playing via autoplay)');
+        }
       }
 
       isEnabled.value = true;

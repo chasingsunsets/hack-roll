@@ -268,13 +268,14 @@ io.on('connection', (socket) => {
     room.currentTurnIndex = 0;
     dealCards(room);
 
-    // Send game state to each player (with their own hand)
+    // Send game state to each player (with their own hand and banned move)
     for (const player of room.players) {
       io.to(player.id).emit('game-started', {
         players: getPublicPlayerData(room.players, player.id),
         hand: player.hand,
         deckCount: room.deck.length,
-        currentTurnId: room.players[room.currentTurnIndex].id
+        currentTurnId: room.players[room.currentTurnIndex].id,
+        yourBannedMove: player.bannedMove // Tell each player their own banned move
       });
     }
 
@@ -421,9 +422,11 @@ io.on('connection', (socket) => {
 
   // Report gesture detected (camera sees the reporting player doing a gesture)
   socket.on('gesture-detected', (roomCode, gestureType, callback) => {
+    console.log(`Gesture detected from ${socket.id}: ${gestureType}`);
     const room = rooms.get(roomCode);
 
     if (!room || !room.gameStarted) {
+      console.log('Invalid game state - room not found or game not started');
       callback({ success: false, error: 'Invalid game state' });
       return;
     }
@@ -431,9 +434,12 @@ io.on('connection', (socket) => {
     const player = room.players.find(p => p.id === socket.id);
 
     if (!player) {
+      console.log('Player not found');
       callback({ success: false, error: 'Player not found' });
       return;
     }
+
+    console.log(`Player ${player.name} gesture: ${gestureType}, their banned move: ${player.bannedMove}`);
 
     // Check if this gesture is the player's OWN banned move (they got caught!)
     if (player.bannedMove === gestureType) {

@@ -13,6 +13,7 @@ const gameOver = ref(false);
 const winner = ref(null);
 const isHost = ref(false);
 const myId = ref(null);
+const myBannedMove = ref(null);
 
 // Event callbacks
 let onPlayerJoined = null;
@@ -61,9 +62,11 @@ export function useSocket() {
       hand.value = data.hand;
       deckCount.value = data.deckCount;
       currentTurnId.value = data.currentTurnId;
+      myBannedMove.value = data.yourBannedMove;
       gameStarted.value = true;
       gameOver.value = false;
       winner.value = null;
+      console.log('Game started! Your banned move:', data.yourBannedMove);
       onGameStarted?.(data);
     });
 
@@ -214,6 +217,7 @@ export function useSocket() {
     winner: readonly(winner),
     isHost: readonly(isHost),
     myId: readonly(myId),
+    myBannedMove: readonly(myBannedMove),
 
     // Methods
     connect,

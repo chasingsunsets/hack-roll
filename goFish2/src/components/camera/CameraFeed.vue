@@ -28,16 +28,10 @@ defineExpose({
 watch(() => props.stream, async (newStream) => {
   if (videoEl.value && newStream) {
     videoEl.value.srcObject = newStream;
-    await videoEl.value.play();
+    // Don't call play() - autoplay attribute handles it
+    // and useCamera.js also calls play()
   }
 }, { immediate: true });
-
-onMounted(async () => {
-  if (videoEl.value && props.stream) {
-    videoEl.value.srcObject = props.stream;
-    await videoEl.value.play();
-  }
-});
 
 function getGestureName(type) {
   return BANNED_MOVES[type]?.name || type;
