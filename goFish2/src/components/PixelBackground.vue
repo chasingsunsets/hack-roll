@@ -1,17 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useTurbulence } from '../composables/useTurbulence'
-
-const props = defineProps({
-  roomCode: {
-    type: String,
-    default: null
-  }
-})
-
-const emit = defineEmits(['turbulence-triggered'])
-
-const { turbulenceActive, triggerTurbulence } = useTurbulence()
+import { ref, onMounted } from 'vue'
 
 // Generate random bubbles
 const bubbles = ref([])
@@ -19,69 +7,22 @@ const seaweed = ref([])
 const coral = ref([])
 const bgFish = ref([])
 const lightRays = ref([])
-const particles = ref([])
-
-let turbulenceInterval = null
+const plankton = ref([])
+const jellyfish = ref([])
+const caustics = ref([])
+const dustMotes = ref([])
 
 const generateBubbles = () => {
   const newBubbles = []
-  const bubbleSizes = ['small', 'medium', 'large']
-  const totalBubbles = 35
-  
-  // Create some bubble clusters
-  const clusterCount = 5
-  const bubblesPerCluster = Math.floor(totalBubbles / clusterCount)
-  const remainingBubbles = totalBubbles - (bubblesPerCluster * clusterCount)
-  
-  let bubbleId = 0
-  
-  // Generate clustered bubbles
-  for (let cluster = 0; cluster < clusterCount; cluster++) {
-    const clusterX = 10 + Math.random() * 80
-    const clusterDelay = Math.random() * 8
-    
-    for (let i = 0; i < bubblesPerCluster; i++) {
-      const sizeCategory = bubbleSizes[Math.floor(Math.random() * bubbleSizes.length)]
-      let baseSize
-      if (sizeCategory === 'small') baseSize = 4 + Math.random() * 4
-      else if (sizeCategory === 'medium') baseSize = 8 + Math.random() * 6
-      else baseSize = 14 + Math.random() * 8
-      
-      newBubbles.push({
-        id: bubbleId++,
-        x: clusterX + (Math.random() - 0.5) * 8,
-        delay: clusterDelay + Math.random() * 2,
-        duration: 6 + Math.random() * 8,
-        size: baseSize,
-        sizeCategory: sizeCategory,
-        horizontalDrift: (Math.random() - 0.5) * 30,
-        expansionRate: 0.8 + Math.random() * 0.4,
-        opacityPeak: 0.4 + Math.random() * 0.3
-      })
-    }
-  }
-  
-  // Generate remaining individual bubbles
-  for (let i = 0; i < remainingBubbles; i++) {
-    const sizeCategory = bubbleSizes[Math.floor(Math.random() * bubbleSizes.length)]
-    let baseSize
-    if (sizeCategory === 'small') baseSize = 4 + Math.random() * 4
-    else if (sizeCategory === 'medium') baseSize = 8 + Math.random() * 6
-    else baseSize = 14 + Math.random() * 8
-    
+  for (let i = 0; i < 25; i++) {
     newBubbles.push({
-      id: bubbleId++,
+      id: i,
       x: Math.random() * 100,
-      delay: Math.random() * 12,
-      duration: 6 + Math.random() * 8,
-      size: baseSize,
-      sizeCategory: sizeCategory,
-      horizontalDrift: (Math.random() - 0.5) * 25,
-      expansionRate: 0.8 + Math.random() * 0.4,
-      opacityPeak: 0.4 + Math.random() * 0.3
+      delay: Math.random() * 10,
+      duration: 8 + Math.random() * 6,
+      size: 4 + Math.random() * 10
     })
   }
-  
   bubbles.value = newBubbles
 }
 
@@ -118,23 +59,15 @@ const generateCoral = () => {
 const generateBgFish = () => {
   const newFish = []
   const fishColors = ['#4fc3f7', '#f48fb1', '#81c784', '#ffd54f', '#ff6b35']
-  const fishPatterns = ['solid', 'striped', 'spotted']
-  const fishSizes = ['small', 'medium', 'large']
-  
-  for (let i = 0; i < 10; i++) {
-    const baseSize = 20 + Math.random() * 24
+  for (let i = 0; i < 8; i++) {
     newFish.push({
       id: i,
       y: 15 + Math.random() * 60,
       color: fishColors[Math.floor(Math.random() * fishColors.length)],
-      pattern: fishPatterns[Math.floor(Math.random() * fishPatterns.length)],
-      sizeCategory: fishSizes[Math.floor(Math.random() * fishSizes.length)],
-      duration: 15 + Math.random() * 25,
-      delay: Math.random() * 20,
-      size: baseSize,
-      direction: Math.random() > 0.5 ? 1 : -1,
-      verticalSpeed: 0.3 + Math.random() * 0.5,
-      verticalAmplitude: 15 + Math.random() * 20
+      duration: 20 + Math.random() * 20,
+      delay: Math.random() * 15,
+      size: 16 + Math.random() * 16,
+      direction: Math.random() > 0.5 ? 1 : -1
     })
   }
   bgFish.value = newFish
@@ -145,43 +78,82 @@ const generateLightRays = () => {
   for (let i = 0; i < 7; i++) {
     newRays.push({
       id: i,
-      x: 5 + i * 15 + Math.random() * 8,
+      x: 5 + i * 14 + Math.random() * 8,
       width: 40 + Math.random() * 60,
-      delay: Math.random() * 4,
-      duration: 5 + Math.random() * 4
+      delay: Math.random() * 3,
+      duration: 4 + Math.random() * 3
     })
   }
   lightRays.value = newRays
 }
 
-const generateParticles = () => {
-  const newParticles = []
-  for (let i = 0; i < 30; i++) {
-    newParticles.push({
+// Bioluminescent plankton particles
+const generatePlankton = () => {
+  const newPlankton = []
+  const colors = ['#5dfc9a', '#4fc3f7', '#f8bbd9', '#ffd700', '#81d4fa']
+  for (let i = 0; i < 40; i++) {
+    newPlankton.push({
       id: i,
       x: Math.random() * 100,
       y: Math.random() * 100,
-      size: 1 + Math.random() * 3,
-      delay: Math.random() * 8,
-      duration: 8 + Math.random() * 12,
-      drift: (Math.random() - 0.5) * 50
+      size: 2 + Math.random() * 4,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      duration: 3 + Math.random() * 4,
+      delay: Math.random() * 5,
+      driftX: -20 + Math.random() * 40,
+      driftY: -30 + Math.random() * 20
     })
   }
-  particles.value = newParticles
+  plankton.value = newPlankton
 }
 
-const startTurbulenceTimer = () => {
-  // Trigger turbulence every 20-40 seconds
-  const scheduleNext = () => {
-    const delay = 20000 + Math.random() * 20000
-    turbulenceInterval = setTimeout(() => {
-      triggerTurbulence()
-      // Emit event to parent so it can notify the server
-      emit('turbulence-triggered', props.roomCode)
-      scheduleNext()
-    }, delay)
+// Ethereal jellyfish silhouettes
+const generateJellyfish = () => {
+  const newJellyfish = []
+  for (let i = 0; i < 4; i++) {
+    newJellyfish.push({
+      id: i,
+      x: 10 + Math.random() * 80,
+      y: 20 + Math.random() * 40,
+      size: 30 + Math.random() * 40,
+      duration: 15 + Math.random() * 10,
+      delay: Math.random() * 8,
+      opacity: 0.08 + Math.random() * 0.1
+    })
   }
-  scheduleNext()
+  jellyfish.value = newJellyfish
+}
+
+// Caustic light patterns on the sand
+const generateCaustics = () => {
+  const newCaustics = []
+  for (let i = 0; i < 12; i++) {
+    newCaustics.push({
+      id: i,
+      x: i * 8 + Math.random() * 5,
+      size: 40 + Math.random() * 60,
+      delay: Math.random() * 4,
+      duration: 3 + Math.random() * 2
+    })
+  }
+  caustics.value = newCaustics
+}
+
+// Floating dust motes / marine snow
+const generateDustMotes = () => {
+  const newDust = []
+  for (let i = 0; i < 30; i++) {
+    newDust.push({
+      id: i,
+      x: Math.random() * 100,
+      startY: 10 + Math.random() * 60,
+      size: 1 + Math.random() * 3,
+      duration: 10 + Math.random() * 15,
+      delay: Math.random() * 10,
+      drift: -10 + Math.random() * 20
+    })
+  }
+  dustMotes.value = newDust
 }
 
 onMounted(() => {
@@ -190,48 +162,19 @@ onMounted(() => {
   generateCoral()
   generateBgFish()
   generateLightRays()
-  generateParticles()
-  startTurbulenceTimer()
-})
-
-onUnmounted(() => {
-  if (turbulenceInterval) {
-    clearTimeout(turbulenceInterval)
-  }
+  generatePlankton()
+  generateJellyfish()
+  generateCaustics()
+  generateDustMotes()
 })
 </script>
 
 <template>
-  <div class="pixel-background" :class="{ 'turbulence-active': turbulenceActive }">
+  <div class="pixel-background">
     <!-- Water gradient layers -->
     <div class="water-layer water-top"></div>
     <div class="water-layer water-mid"></div>
     <div class="water-layer water-bottom"></div>
-
-    <!-- Floating particles -->
-    <div class="particles-container">
-      <div
-        v-for="particle in particles"
-        :key="particle.id"
-        class="particle"
-        :style="{
-          left: particle.x + '%',
-          top: particle.y + '%',
-          width: particle.size + 'px',
-          height: particle.size + 'px',
-          animationDelay: particle.delay + 's',
-          animationDuration: particle.duration + 's',
-          '--particle-drift': particle.drift + 'px'
-        }"
-      ></div>
-    </div>
-
-    <!-- Turbulence effect overlay -->
-    <div v-if="turbulenceActive" class="turbulence-overlay">
-      <div class="turbulence-wave wave-1"></div>
-      <div class="turbulence-wave wave-2"></div>
-      <div class="turbulence-wave wave-3"></div>
-    </div>
 
     <!-- Light rays from surface -->
     <div class="light-rays">
@@ -257,21 +200,14 @@ onUnmounted(() => {
         v-for="bubble in bubbles"
         :key="bubble.id"
         class="bubble"
-        :class="bubble.sizeCategory"
         :style="{
           left: bubble.x + '%',
           animationDelay: bubble.delay + 's',
           animationDuration: bubble.duration + 's',
           width: bubble.size + 'px',
-          height: bubble.size + 'px',
-          '--bubble-drift': bubble.horizontalDrift + 'px',
-          '--bubble-expansion': bubble.expansionRate,
-          '--bubble-opacity-peak': bubble.opacityPeak
+          height: bubble.size + 'px'
         }"
-      >
-        <div class="bubble-inner"></div>
-        <div class="bubble-highlight"></div>
-      </div>
+      ></div>
     </div>
 
     <!-- Coral formations -->
@@ -340,61 +276,105 @@ onUnmounted(() => {
           animationDelay: fish.delay + 's',
           '--fish-color': fish.color,
           '--fish-size': fish.size + 'px',
-          '--fish-direction': fish.direction,
-          '--vertical-speed': fish.verticalSpeed,
-          '--vertical-amplitude': fish.verticalAmplitude + 'px'
+          '--fish-direction': fish.direction
         }"
       >
-        <svg :width="fish.size" :height="fish.size * 0.7" viewBox="0 0 20 14" class="fish-svg">
-          <defs>
-            <linearGradient :id="`fishGrad${fish.id}`" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" :stop-color="fish.color" stop-opacity="1"/>
-              <stop offset="100%" :stop-color="fish.color" stop-opacity="0.7"/>
-            </linearGradient>
-          </defs>
-          
-          <!-- Tail fin (caudal) -->
-          <path d="M 0 5 L 2 3 L 2 5 L 0 7 L 2 9 L 2 11 L 0 7 Z" :fill="fish.color" opacity="0.8"/>
-          <path d="M 1 6 L 2 4 L 2 8 L 1 8 Z" :fill="fish.color" opacity="0.6"/>
-          
-          <!-- Body (teardrop/oval shape) -->
-          <ellipse cx="10" cy="7" rx="7" ry="5" :fill="'url(#fishGrad' + fish.id + ')'"/>
-          <ellipse cx="8" cy="6.5" rx="5" ry="4" :fill="fish.color" opacity="0.9"/>
-          
-          <!-- Scales pattern - spotted -->
-          <g v-if="fish.pattern === 'spotted'">
-            <circle cx="8" cy="6" r="1" :fill="fish.color" opacity="0.3"/>
-            <circle cx="11" cy="7" r="0.8" :fill="fish.color" opacity="0.3"/>
-            <circle cx="9" cy="8" r="0.6" :fill="fish.color" opacity="0.3"/>
-          </g>
-          <!-- Scales pattern - striped -->
-          <g v-else-if="fish.pattern === 'striped'">
-            <line x1="5" y1="6" x2="13" y2="6" :stroke="fish.color" stroke-width="0.5" opacity="0.4"/>
-            <line x1="6" y1="7.5" x2="12" y2="7.5" :stroke="fish.color" stroke-width="0.5" opacity="0.4"/>
-            <line x1="5.5" y1="8.5" x2="11.5" y2="8.5" :stroke="fish.color" stroke-width="0.5" opacity="0.4"/>
-          </g>
-          
-          <!-- Dorsal fin (top) -->
-          <path d="M 6 2 L 7 1 L 9 1.5 L 11 1 L 12 2 L 11 3 L 9 2.5 L 7 3 Z" :fill="fish.color" opacity="0.7"/>
-          <path d="M 8 1.5 L 9 1.5 L 9 2.5 L 8 2.5 Z" :fill="fish.color" opacity="0.5"/>
-          
-          <!-- Pectoral fin (side) -->
-          <ellipse cx="5" cy="7" rx="2" ry="1.5" :fill="fish.color" opacity="0.6" transform="rotate(-20 5 7)"/>
-          
-          <!-- Pelvic fin (bottom) -->
-          <path d="M 7 10 L 8 11 L 9 11 L 10 10 L 9 9.5 L 8 9.5 Z" :fill="fish.color" opacity="0.7"/>
-          
+        <svg :width="fish.size" :height="fish.size * 0.6" viewBox="0 0 16 10" class="fish-svg">
+          <!-- Fish body -->
+          <rect x="3" y="2" width="8" height="6" :fill="fish.color"/>
+          <rect x="2" y="3" width="1" height="4" :fill="fish.color"/>
+          <rect x="11" y="3" width="1" height="4" :fill="fish.color"/>
+          <!-- Tail -->
+          <rect x="0" y="2" width="2" height="2" :fill="fish.color"/>
+          <rect x="0" y="6" width="2" height="2" :fill="fish.color"/>
           <!-- Eye -->
-          <circle cx="12" cy="6.5" r="1.5" fill="#ffffff" opacity="0.9"/>
-          <circle cx="12.5" cy="6.5" r="1" :fill="fish.color" opacity="0.3"/>
-          <circle cx="12.8" cy="6.5" r="0.6" fill="#1a1a2e"/>
-          <circle cx="13" cy="6.3" r="0.2" fill="#ffffff" opacity="0.8"/>
-          
-          <!-- Mouth -->
-          <ellipse cx="15" cy="7" rx="1" ry="0.5" :fill="fish.color" opacity="0.6"/>
+          <rect x="9" y="4" width="2" height="2" fill="#ffffff"/>
+          <rect x="10" y="4" width="1" height="1" fill="#1a1a2e"/>
+          <!-- Fin -->
+          <rect x="5" y="0" width="3" height="2" :fill="fish.color" opacity="0.7"/>
+          <rect x="5" y="8" width="3" height="2" :fill="fish.color" opacity="0.7"/>
         </svg>
       </div>
     </div>
+
+    <!-- Bioluminescent plankton -->
+    <div class="plankton-container">
+      <div
+        v-for="p in plankton"
+        :key="p.id"
+        class="plankton"
+        :style="{
+          left: p.x + '%',
+          top: p.y + '%',
+          width: p.size + 'px',
+          height: p.size + 'px',
+          '--color': p.color,
+          '--duration': p.duration + 's',
+          '--delay': p.delay + 's',
+          '--drift-x': p.driftX + 'px',
+          '--drift-y': p.driftY + 'px'
+        }"
+      ></div>
+    </div>
+
+    <!-- Ethereal jellyfish silhouettes -->
+    <div class="jellyfish-container">
+      <div
+        v-for="jelly in jellyfish"
+        :key="jelly.id"
+        class="jellyfish"
+        :style="{
+          left: jelly.x + '%',
+          top: jelly.y + '%',
+          '--size': jelly.size + 'px',
+          '--duration': jelly.duration + 's',
+          '--delay': jelly.delay + 's',
+          '--opacity': jelly.opacity
+        }"
+      >
+        <div class="jelly-bell"></div>
+        <div class="jelly-tentacles">
+          <div class="tentacle" v-for="t in 5" :key="t"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Caustic light patterns on sand -->
+    <div class="caustics-container">
+      <div
+        v-for="c in caustics"
+        :key="c.id"
+        class="caustic"
+        :style="{
+          left: c.x + '%',
+          width: c.size + 'px',
+          height: c.size + 'px',
+          '--delay': c.delay + 's',
+          '--duration': c.duration + 's'
+        }"
+      ></div>
+    </div>
+
+    <!-- Marine snow / dust motes -->
+    <div class="dust-container">
+      <div
+        v-for="d in dustMotes"
+        :key="d.id"
+        class="dust-mote"
+        :style="{
+          left: d.x + '%',
+          top: d.startY + '%',
+          width: d.size + 'px',
+          height: d.size + 'px',
+          '--duration': d.duration + 's',
+          '--delay': d.delay + 's',
+          '--drift': d.drift + 'px'
+        }"
+      ></div>
+    </div>
+
+    <!-- Ambient underwater glow -->
+    <div class="ambient-glow"></div>
   </div>
 </template>
 
@@ -405,9 +385,8 @@ onUnmounted(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 0;
+  z-index: -1;
   overflow: hidden;
-  background: #0a1628;
 }
 
 /* Water layers */
@@ -492,88 +471,32 @@ onUnmounted(() => {
 
 .bubble {
   position: absolute;
-  bottom: -30px;
-  border-radius: 50%;
-  animation: rise ease-in-out infinite;
+  bottom: -20px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  animation: rise linear infinite;
   image-rendering: pixelated;
-  pointer-events: none;
-}
-
-.bubble-inner {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 
-    inset 0 0 6px rgba(255, 255, 255, 0.3),
-    0 0 4px rgba(255, 255, 255, 0.2);
-}
-
-.bubble-highlight {
-  position: absolute;
-  top: 20%;
-  left: 25%;
-  width: 30%;
-  height: 30%;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.4);
-  box-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
-}
-
-.bubble.small {
-  border-width: 1.5px;
-}
-
-.bubble.small .bubble-inner {
-  border-width: 1.5px;
-}
-
-.bubble.large {
-  border-width: 2.5px;
-}
-
-.bubble.large .bubble-inner {
-  border-width: 2.5px;
 }
 
 @keyframes rise {
   0% {
-    bottom: -30px;
+    bottom: -20px;
     opacity: 0;
-    transform: translateX(0) scale(0.8);
+    transform: translateX(0);
   }
-  5% {
-    opacity: calc(var(--bubble-opacity-peak, 0.5) * 0.3);
-  }
-  15% {
-    opacity: calc(var(--bubble-opacity-peak, 0.5) * 0.7);
-    transform: translateX(calc(var(--bubble-drift, 0px) * 0.3)) scale(0.85);
-  }
-  30% {
-    opacity: var(--bubble-opacity-peak, 0.5);
-    transform: translateX(calc(var(--bubble-drift, 0px) * 0.6)) scale(0.9);
+  10% {
+    opacity: 0.5;
   }
   50% {
-    opacity: var(--bubble-opacity-peak, 0.5);
-    transform: translateX(var(--bubble-drift, 0px)) scale(1);
+    transform: translateX(10px);
   }
-  70% {
-    opacity: calc(var(--bubble-opacity-peak, 0.5) * 0.8);
-    transform: translateX(calc(var(--bubble-drift, 0px) * 0.8)) scale(calc(1 * var(--bubble-expansion, 1)));
-  }
-  85% {
-    opacity: calc(var(--bubble-opacity-peak, 0.5) * 0.5);
-    transform: translateX(calc(var(--bubble-drift, 0px) * 0.5)) scale(calc(1.1 * var(--bubble-expansion, 1)));
-  }
-  95% {
-    opacity: calc(var(--bubble-opacity-peak, 0.5) * 0.2);
-    transform: translateX(calc(var(--bubble-drift, 0px) * 0.3)) scale(calc(1.15 * var(--bubble-expansion, 1)));
+  90% {
+    opacity: 0.4;
   }
   100% {
     bottom: 110%;
     opacity: 0;
-    transform: translateX(calc(var(--bubble-drift, 0px) * 0.2)) scale(calc(1.2 * var(--bubble-expansion, 1)));
+    transform: translateX(-10px);
   }
 }
 
@@ -734,9 +657,8 @@ onUnmounted(() => {
 
 .bg-fish {
   position: absolute;
-  opacity: 0.4;
+  opacity: 0.25;
   animation: swim linear infinite;
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.1));
 }
 
 .fish-svg {
@@ -748,37 +670,67 @@ onUnmounted(() => {
 @keyframes swim {
   0% {
     left: -50px;
-    transform: translateY(0) translateX(0);
-  }
-  12.5% {
-    transform: translateY(calc(var(--vertical-amplitude, 15px) * -0.5)) translateX(2px);
+    transform: translateY(0);
   }
   25% {
-    transform: translateY(calc(var(--vertical-amplitude, 15px) * -1)) translateX(0);
-  }
-  37.5% {
-    transform: translateY(calc(var(--vertical-amplitude, 15px) * -0.5)) translateX(-2px);
+    transform: translateY(-10px);
   }
   50% {
-    transform: translateY(0) translateX(0);
-  }
-  62.5% {
-    transform: translateY(calc(var(--vertical-amplitude, 15px) * 0.5)) translateX(2px);
+    transform: translateY(0);
   }
   75% {
-    transform: translateY(calc(var(--vertical-amplitude, 15px) * 1)) translateX(0);
-  }
-  87.5% {
-    transform: translateY(calc(var(--vertical-amplitude, 15px) * 0.5)) translateX(-2px);
+    transform: translateY(10px);
   }
   100% {
     left: calc(100% + 50px);
-    transform: translateY(0) translateX(0);
+    transform: translateY(0);
   }
 }
 
-/* Particles */
-.particles-container {
+/* Bioluminescent plankton */
+.plankton-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.plankton {
+  position: absolute;
+  background: var(--color);
+  box-shadow: 0 0 6px var(--color), 0 0 12px var(--color);
+  animation: plankton-float var(--duration) ease-in-out var(--delay) infinite;
+  opacity: 0;
+}
+
+@keyframes plankton-float {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.5);
+  }
+  20% {
+    opacity: 0.8;
+    transform: translate(calc(var(--drift-x) * 0.3), calc(var(--drift-y) * 0.3)) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(calc(var(--drift-x) * 0.6), calc(var(--drift-y) * 0.6)) scale(1.2);
+  }
+  80% {
+    opacity: 0.6;
+    transform: translate(calc(var(--drift-x) * 0.9), calc(var(--drift-y) * 0.9)) scale(0.8);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--drift-x), var(--drift-y)) scale(0.3);
+  }
+}
+
+/* Ethereal jellyfish */
+.jellyfish-container {
   position: absolute;
   top: 0;
   left: 0;
@@ -787,232 +739,198 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
-.particle {
+.jellyfish {
   position: absolute;
-  background: rgba(255, 255, 255, 0.4);
-  border-radius: 50%;
-  animation: particle-float linear infinite;
-  box-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
+  opacity: var(--opacity);
+  animation: jellyfish-drift var(--duration) ease-in-out var(--delay) infinite;
 }
 
-@keyframes particle-float {
+.jelly-bell {
+  width: var(--size);
+  height: calc(var(--size) * 0.6);
+  background: radial-gradient(ellipse at 50% 30%, rgba(79, 195, 247, 0.4) 0%, rgba(79, 195, 247, 0.1) 60%, transparent 80%);
+  border-radius: 50% 50% 40% 40%;
+  position: relative;
+}
+
+.jelly-bell::after {
+  content: '';
+  position: absolute;
+  top: 10%;
+  left: 20%;
+  width: 60%;
+  height: 40%;
+  background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+  border-radius: 50%;
+}
+
+.jelly-tentacles {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  margin-top: -4px;
+}
+
+.tentacle {
+  width: 2px;
+  height: calc(var(--size) * 0.8);
+  background: linear-gradient(180deg, rgba(79, 195, 247, 0.3) 0%, rgba(79, 195, 247, 0.05) 100%);
+  animation: tentacle-wave 2s ease-in-out infinite;
+}
+
+.tentacle:nth-child(1) { animation-delay: 0s; height: calc(var(--size) * 0.7); }
+.tentacle:nth-child(2) { animation-delay: 0.2s; height: calc(var(--size) * 0.9); }
+.tentacle:nth-child(3) { animation-delay: 0.4s; height: calc(var(--size) * 1); }
+.tentacle:nth-child(4) { animation-delay: 0.2s; height: calc(var(--size) * 0.85); }
+.tentacle:nth-child(5) { animation-delay: 0s; height: calc(var(--size) * 0.65); }
+
+@keyframes jellyfish-drift {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+  }
+  25% {
+    transform: translateY(-20px) translateX(10px);
+  }
+  50% {
+    transform: translateY(-30px) translateX(-5px);
+  }
+  75% {
+    transform: translateY(-15px) translateX(15px);
+  }
+}
+
+@keyframes tentacle-wave {
+  0%, 100% {
+    transform: skewX(-5deg) scaleY(1);
+  }
+  50% {
+    transform: skewX(5deg) scaleY(1.1);
+  }
+}
+
+/* Caustic light patterns */
+.caustics-container {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 80px;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.caustic {
+  position: absolute;
+  bottom: 10px;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 40%, transparent 70%);
+  animation: caustic-shimmer var(--duration) ease-in-out var(--delay) infinite;
+  transform-origin: center;
+}
+
+@keyframes caustic-shimmer {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8) rotate(0deg);
+  }
+  25% {
+    opacity: 0.6;
+    transform: scale(1.1) rotate(5deg);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.9) rotate(-3deg);
+  }
+  75% {
+    opacity: 0.7;
+    transform: scale(1.2) rotate(2deg);
+  }
+}
+
+/* Marine snow / dust motes */
+.dust-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.dust-mote {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.4);
+  animation: dust-fall var(--duration) linear var(--delay) infinite;
+  opacity: 0;
+}
+
+@keyframes dust-fall {
   0% {
-    transform: translate(0, 0) rotate(0deg);
     opacity: 0;
+    transform: translateY(0) translateX(0);
   }
   10% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.3;
+    transform: translateY(100px) translateX(var(--drift));
+  }
+  90% {
+    opacity: 0.2;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(200px) translateX(calc(var(--drift) * 2));
+  }
+}
+
+/* Ambient underwater glow */
+.ambient-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 30% 20%, rgba(79, 195, 247, 0.08) 0%, transparent 50%),
+              radial-gradient(ellipse at 70% 60%, rgba(93, 252, 154, 0.05) 0%, transparent 40%),
+              radial-gradient(ellipse at 50% 80%, rgba(255, 215, 0, 0.04) 0%, transparent 35%);
+  animation: ambient-pulse 8s ease-in-out infinite;
+}
+
+@keyframes ambient-pulse {
+  0%, 100% {
     opacity: 0.6;
   }
   50% {
-    transform: translate(var(--particle-drift, 0px), -30vh) rotate(180deg);
-    opacity: 0.8;
-  }
-  90% {
-    opacity: 0.4;
-  }
-  100% {
-    transform: translate(calc(var(--particle-drift, 0px) * 0.5), -60vh) rotate(360deg);
-    opacity: 0;
-  }
-}
-
-/* Turbulence effects */
-.turbulence-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 100;
-}
-
-.turbulence-wave {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.03) 25%,
-    rgba(79, 195, 247, 0.08) 50%,
-    rgba(255, 255, 255, 0.03) 75%,
-    transparent 100%
-  );
-  animation: turbulence-sweep 3s ease-in-out;
-}
-
-.turbulence-wave.wave-2 {
-  animation-delay: 0.3s;
-  animation-duration: 2.7s;
-  background: linear-gradient(
-    45deg,
-    transparent 0%,
-    rgba(129, 199, 132, 0.05) 50%,
-    transparent 100%
-  );
-}
-
-.turbulence-wave.wave-3 {
-  animation-delay: 0.6s;
-  animation-duration: 3.3s;
-  background: linear-gradient(
-    135deg,
-    transparent 0%,
-    rgba(255, 215, 0, 0.04) 50%,
-    transparent 100%
-  );
-}
-
-@keyframes turbulence-sweep {
-  0% {
-    transform: translateX(-100%) scale(1);
-    opacity: 0;
-  }
-  20% {
     opacity: 1;
   }
-  80% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(100%) scale(1.2);
-    opacity: 0;
-  }
 }
 
-/* Turbulence active state - screen sway */
-.pixel-background.turbulence-active {
-  animation: underwater-sway 3s ease-in-out;
+/* Enhanced light rays with color shift */
+.light-ray {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(79, 195, 247, 0.1) 20%,
+    rgba(255, 255, 255, 0.08) 40%,
+    rgba(93, 252, 154, 0.04) 60%,
+    transparent 100%
+  );
+  transform: skewX(-15deg);
+  animation: ray-shimmer linear infinite, ray-color-shift 6s ease-in-out infinite;
 }
 
-@keyframes underwater-sway {
+@keyframes ray-color-shift {
   0%, 100% {
-    transform: translateX(0) rotate(0deg);
-  }
-  10% {
-    transform: translateX(-15px) rotate(-0.5deg);
-  }
-  20% {
-    transform: translateX(10px) rotate(0.3deg);
-  }
-  30% {
-    transform: translateX(-12px) rotate(-0.4deg);
-  }
-  40% {
-    transform: translateX(8px) rotate(0.2deg);
+    filter: hue-rotate(0deg);
   }
   50% {
-    transform: translateX(-10px) rotate(-0.3deg);
-  }
-  60% {
-    transform: translateX(7px) rotate(0.2deg);
-  }
-  70% {
-    transform: translateX(-5px) rotate(-0.2deg);
-  }
-  80% {
-    transform: translateX(3px) rotate(0.1deg);
-  }
-  90% {
-    transform: translateX(-2px) rotate(-0.05deg);
-  }
-}
-
-/* Enhanced light rays during turbulence */
-.turbulence-active .light-ray {
-  animation: ray-shimmer-intense 1.5s linear infinite;
-}
-
-@keyframes ray-shimmer-intense {
-  0%, 100% {
-    opacity: 0.2;
-    transform: skewX(-15deg) translateX(0);
-  }
-  25% {
-    opacity: 0.8;
-    transform: skewX(-12deg) translateX(10px);
-  }
-  50% {
-    opacity: 0.4;
-    transform: skewX(-18deg) translateX(-5px);
-  }
-  75% {
-    opacity: 0.9;
-    transform: skewX(-10deg) translateX(15px);
-  }
-}
-
-/* Enhanced bubbles during turbulence */
-.turbulence-active .bubble {
-  animation: rise-turbulent 8s ease-in-out infinite !important;
-}
-
-@keyframes rise-turbulent {
-  0% {
-    bottom: -30px;
-    opacity: 0;
-    transform: translateX(0) scale(0.8) rotate(0deg);
-  }
-  5% {
-    opacity: calc(var(--bubble-opacity-peak, 0.5) * 0.3);
-  }
-  15% {
-    opacity: calc(var(--bubble-opacity-peak, 0.5) * 0.7);
-    transform: translateX(calc(var(--bubble-drift, 0px) * 0.5)) scale(0.85) rotate(-15deg);
-  }
-  30% {
-    opacity: var(--bubble-opacity-peak, 0.5);
-    transform: translateX(calc(var(--bubble-drift, 0px) * 1.5)) scale(0.9) rotate(20deg);
-  }
-  50% {
-    opacity: var(--bubble-opacity-peak, 0.5);
-    transform: translateX(calc(var(--bubble-drift, 0px) * 2)) scale(1) rotate(-25deg);
-  }
-  70% {
-    opacity: calc(var(--bubble-opacity-peak, 0.5) * 0.8);
-    transform: translateX(calc(var(--bubble-drift, 0px) * 1.5)) scale(calc(1 * var(--bubble-expansion, 1))) rotate(30deg);
-  }
-  85% {
-    opacity: calc(var(--bubble-opacity-peak, 0.5) * 0.5);
-    transform: translateX(calc(var(--bubble-drift, 0px) * 0.8)) scale(calc(1.1 * var(--bubble-expansion, 1))) rotate(-20deg);
-  }
-  95% {
-    opacity: calc(var(--bubble-opacity-peak, 0.5) * 0.2);
-    transform: translateX(calc(var(--bubble-drift, 0px) * 0.3)) scale(calc(1.15 * var(--bubble-expansion, 1))) rotate(10deg);
-  }
-  100% {
-    bottom: 110%;
-    opacity: 0;
-    transform: translateX(calc(var(--bubble-drift, 0px) * 0.2)) scale(calc(1.2 * var(--bubble-expansion, 1))) rotate(0deg);
-  }
-}
-
-/* Fish swim faster during turbulence */
-.turbulence-active .bg-fish {
-  animation-duration: 8s !important;
-  opacity: 0.6 !important;
-}
-
-/* Seaweed sways more during turbulence */
-.turbulence-active .seaweed {
-  animation: sway-intense 1.5s ease-in-out infinite !important;
-}
-
-@keyframes sway-intense {
-  0%, 100% {
-    transform: skewX(-15deg) scaleY(1.05);
-  }
-  25% {
-    transform: skewX(-5deg) scaleY(0.98);
-  }
-  50% {
-    transform: skewX(15deg) scaleY(1.05);
-  }
-  75% {
-    transform: skewX(5deg) scaleY(0.98);
+    filter: hue-rotate(15deg);
   }
 }
 
@@ -1026,8 +944,12 @@ onUnmounted(() => {
     opacity: 0.15;
   }
 
-  .particle {
-    opacity: 0.3;
+  .jellyfish {
+    display: none;
+  }
+
+  .plankton-container .plankton:nth-child(n+20) {
+    display: none;
   }
 }
 </style>

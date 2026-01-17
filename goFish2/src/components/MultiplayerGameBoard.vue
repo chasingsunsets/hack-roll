@@ -18,7 +18,6 @@ import BannedMoveAlert from './banned-moves/BannedMoveAlert.vue'
 import { useCamera } from '../composables/useCamera'
 import { useGestureDetection } from '../composables/useGestureDetection'
 import { useSocket } from '../composables/useSocket'
-import { useTurbulence } from '../composables/useTurbulence'
 import { BANNED_MOVES } from '../services/gestureDefinitions'
 
 const props = defineProps({
@@ -29,9 +28,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['leave-game'])
-
-// Turbulence state
-const { turbulenceActive, turbulenceRevealedHands, setRevealedHands } = useTurbulence()
 
 // Socket state
 const {
@@ -50,8 +46,7 @@ const {
   reportBannedMove,
   reportGesture,
   setEventHandlers,
-  disconnect,
-  socket
+  disconnect
 } = useSocket()
 
 // Local UI state
@@ -87,33 +82,13 @@ const playerRanks = computed(() => {
   return ranks.sort((a, b) => RANKS.indexOf(a) - RANKS.indexOf(b))
 })
 
-const opponentData = computed(() => {
-  // During turbulence, use revealed hands if available
-  if (turbulenceActive.value && turbulenceRevealedHands.value.length > 0) {
-    console.log('TURBULENCE ACTIVE! Building opponent data with revealed cards')
-    console.log('turbulenceRevealedHands:', turbulenceRevealedHands.value)
-    const data = opponents.value.map(opp => {
-      const revealedHand = turbulenceRevealedHands.value.find(h => h.id === opp.id)
-      console.log(`Opponent ${opp.name} (${opp.id}):`, revealedHand ? `${revealedHand.cards.length} cards` : 'no reveal data')
-      return {
-        name: opp.name,
-        cardCount: opp.cardCount,
-        cards: revealedHand ? revealedHand.cards : [],
-        id: opp.id
-      }
-    })
-    console.log('Final opponentData:', data)
-    return data
-  }
-
-  // Normal mode - no cards revealed
-  return opponents.value.map(opp => ({
+const opponentData = computed(() =>
+  opponents.value.map(opp => ({
     name: opp.name,
     cardCount: opp.cardCount,
-    cards: [],
     id: opp.id
   }))
-})
+)
 
 const canDrawCard = computed(() =>
   isMyTurn.value &&
@@ -130,25 +105,12 @@ watch(isMyTurn, (myTurn) => {
 })
 
 // Socket event handlers
-// Turbulence handler
-function handleTurbulence(code) {
-  console.log('Turbulence triggered! Room code:', code)
-  console.log('Socket exists:', !!socket.value)
-  if (code && socket.value) {
-    console.log('Emitting turbulence-start to server')
-    socket.value.emit('turbulence-start', code)
-  }
-}
-
 onMounted(() => {
-  // Listen for turbulence reveal
-  if (socket.value) {
-    console.log('Setting up turbulence-reveal listener')
-    socket.value.on('turbulence-reveal', (data) => {
-      console.log('Received turbulence-reveal from server:', data)
-      setRevealedHands(data.allHands)
-      console.log('Revealed hands set:', data.allHands)
-    })
+  // Set initial message based on whether it's our turn
+  if (isMyTurn.value) {
+    gameMessage.value = { text: 'Your turn! Select a card to ask for.', type: 'action' }
+  } else {
+    gameMessage.value = { text: 'Waiting for other players...', type: 'info' }
   }
 
   setEventHandlers({
@@ -242,16 +204,15 @@ onMounted(() => {
           type: 'info'
         }
       }
+    },
+
+    onPlayerRejoined: (data) => {
+      gameMessage.value = {
+        text: `${data.playerName} reconnected!`,
+        type: 'success'
+      }
     }
   })
-
-  // Set initial message based on turn
-  if (isMyTurn.value) {
-    gameMessage.value = { text: 'Your turn! Select a card to ask for.', type: 'action' }
-  } else {
-    const currentPlayer = players.value.find(p => p.id === currentTurnId.value)
-    gameMessage.value = { text: `Waiting for ${currentPlayer?.name}...`, type: 'info' }
-  }
 })
 
 onUnmounted(() => {
@@ -436,8 +397,8 @@ function handleLeaveGame() {
 </script>
 
 <template>
-  <div class="game-board" :class="{ 'turbulence-sway': turbulenceActive }">
-    <PixelBackground :room-code="roomCode" @turbulence-triggered="handleTurbulence" />
+  <div class="game-board">
+    <PixelBackground />
 
     <!-- Visual Effects -->
     <GoFishSplash :show="showGoFishSplash" @complete="onGoFishSplashComplete" />
@@ -491,11 +452,10 @@ function handleLeaveGame() {
       <!-- Opponents row -->
       <div class="opponents-row">
         <OpponentHand
-          v-for="opp in opponentData"
+          v-for="opp in opponents"
           :key="opp.id"
           :name="opp.name"
           :card-count="opp.cardCount"
-          :cards="opp.cards || []"
           :is-current-turn="currentTurnId === opp.id"
           position="top"
         />
@@ -586,44 +546,6 @@ function handleLeaveGame() {
   box-sizing: border-box;
   position: relative;
   font-family: 'Press Start 2P', monospace;
-}
-
-/* Turbulence effect - screen sway */
-.game-board.turbulence-sway {
-  animation: turbulence-sway 3s ease-in-out;
-}
-
-@keyframes turbulence-sway {
-  0%, 100% {
-    transform: translateX(0) rotate(0deg);
-  }
-  10% {
-    transform: translateX(-8px) rotate(-0.3deg);
-  }
-  20% {
-    transform: translateX(6px) rotate(0.2deg);
-  }
-  30% {
-    transform: translateX(-7px) rotate(-0.25deg);
-  }
-  40% {
-    transform: translateX(5px) rotate(0.15deg);
-  }
-  50% {
-    transform: translateX(-6px) rotate(-0.2deg);
-  }
-  60% {
-    transform: translateX(4px) rotate(0.1deg);
-  }
-  70% {
-    transform: translateX(-3px) rotate(-0.1deg);
-  }
-  80% {
-    transform: translateX(2px) rotate(0.05deg);
-  }
-  90% {
-    transform: translateX(-1px) rotate(-0.02deg);
-  }
 }
 
 .game-header {

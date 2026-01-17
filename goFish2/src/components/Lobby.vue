@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { useSocket } from '../composables/useSocket';
 import PixelFish from './PixelFish.vue';
 import PixelBackground from './PixelBackground.vue';
@@ -12,12 +12,16 @@ const {
   players,
   isHost,
   myId,
+  gameStarted,
   connect,
   disconnect,
   createRoom,
   joinRoom,
+  rejoinRoom,
   startGame,
-  setEventHandlers
+  setEventHandlers,
+  hasSession,
+  clearSession
 } = useSocket();
 
 const playerName = ref('');
@@ -25,6 +29,7 @@ const joinCode = ref('');
 const error = ref('');
 const inRoom = ref(false);
 const isLoading = ref(false);
+const isRejoining = ref(false);
 
 onMounted(() => {
   connect();
@@ -37,9 +42,24 @@ onMounted(() => {
     },
     onGameStarted: (data) => {
       emit('game-started', data);
+    },
+    onPlayerRejoined: (data) => {
+      console.log('Player rejoined:', data.playerName);
     }
   });
 });
+
+// Watch for successful rejoin
+watch([roomCode, gameStarted], ([newRoomCode, newGameStarted]) => {
+  if (newRoomCode && !inRoom.value) {
+    inRoom.value = true;
+    isRejoining.value = false;
+    // If game was already in progress, emit game-started
+    if (newGameStarted) {
+      emit('game-started', { rejoined: true });
+    }
+  }
+}, { immediate: true });
 
 onUnmounted(() => {
   // Don't disconnect here - we want to stay connected for the game
@@ -112,6 +132,12 @@ function leaveRoom() {
   disconnect();
   inRoom.value = false;
   connect(); // Reconnect for next attempt
+}
+
+function handleClearSession() {
+  clearSession();
+  inRoom.value = false;
+  error.value = '';
 }
 </script>
 

@@ -167,9 +167,12 @@ onMounted(() => {
   height: var(--card-height, 130px);
   position: relative;
   cursor: pointer;
-  transition: transform 0.15s steps(4), box-shadow 0.15s steps(4);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.2s ease-out,
+              filter 0.2s ease-out;
   image-rendering: pixelated;
   border-radius: 0 !important;
+  --shimmer-color: rgba(255, 255, 255, 0.4);
 }
 
 .card.small {
@@ -195,19 +198,54 @@ onMounted(() => {
     4px 4px 0 rgba(0, 0, 0, 0.3);
 }
 
+/* Shimmer overlay effect */
+.card-inner::before {
+  content: '';
+  position: absolute;
+  top: -100%;
+  left: -100%;
+  width: 300%;
+  height: 300%;
+  background: linear-gradient(
+    135deg,
+    transparent 30%,
+    var(--shimmer-color) 50%,
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.card:hover .card-inner::before {
+  opacity: 1;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translate(-30%, -30%) rotate(0deg); }
+  100% { transform: translate(30%, 30%) rotate(0deg); }
+}
+
 .card:hover {
-  transform: translateY(-8px);
+  transform: translateY(-12px) scale(1.02);
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.3));
+  z-index: 100;
 }
 
 .card:hover .card-inner {
   box-shadow:
     inset -3px -3px 0 #d4d0c4,
     inset 3px 3px 0 #ffffff,
+    0 0 20px rgba(255, 215, 0, 0.3),
     6px 8px 0 rgba(0, 0, 0, 0.4);
 }
 
 .card.selected {
-  transform: translateY(-16px);
+  transform: translateY(-20px) scale(1.05);
+  filter: drop-shadow(0 12px 24px rgba(255, 215, 0, 0.4));
+  z-index: 200;
 }
 
 .card.selected .card-inner {
@@ -215,8 +253,32 @@ onMounted(() => {
   box-shadow:
     inset -3px -3px 0 #d4d0c4,
     inset 3px 3px 0 #ffffff,
-    0 0 0 3px #ffd700,
+    0 0 0 4px #ffd700,
+    0 0 30px rgba(255, 215, 0, 0.6),
+    0 0 60px rgba(255, 215, 0, 0.3),
     8px 10px 0 rgba(0, 0, 0, 0.4);
+  animation: selectedPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes selectedPulse {
+  0%, 100% {
+    box-shadow:
+      inset -3px -3px 0 #d4d0c4,
+      inset 3px 3px 0 #ffffff,
+      0 0 0 4px #ffd700,
+      0 0 30px rgba(255, 215, 0, 0.6),
+      0 0 60px rgba(255, 215, 0, 0.3),
+      8px 10px 0 rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    box-shadow:
+      inset -3px -3px 0 #d4d0c4,
+      inset 3px 3px 0 #ffffff,
+      0 0 0 6px #ffee88,
+      0 0 50px rgba(255, 215, 0, 0.8),
+      0 0 80px rgba(255, 215, 0, 0.5),
+      8px 10px 0 rgba(0, 0, 0, 0.4);
+  }
 }
 
 /* Pixel border decorations */
