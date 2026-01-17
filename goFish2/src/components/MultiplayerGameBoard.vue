@@ -9,11 +9,15 @@ import PixelBackground from './PixelBackground.vue'
 import PixelFish from './PixelFish.vue'
 import GoFishSplash from './GoFishSplash.vue'
 import BookCompleteEffect from './BookCompleteEffect.vue'
+import TrollerOctopus from './TrollerOctopus.vue'
+import DeckSwapTroll from './DeckSwapTroll.vue'
+import EarthquakeTroll from './EarthquakeTroll.vue'
 
 // Camera & Gesture Detection
 import CameraFeed from './camera/CameraFeed.vue'
 import CameraPermission from './camera/CameraPermission.vue'
 import BannedMoveAlert from './banned-moves/BannedMoveAlert.vue'
+import PlayerCameraFeed from './camera/PlayerCameraFeed.vue'
 import { useCamera } from '../composables/useCamera'
 import { useGestureDetection } from '../composables/useGestureDetection'
 import { useSocket } from '../composables/useSocket'
@@ -53,10 +57,12 @@ const selectedCard = ref(null)
 const gameMessage = ref({ text: 'Game started! Wait for your turn.', type: 'info' })
 const selectedRank = ref(null)
 const selectedOpponent = ref(null)
+const mustDrawCard = ref(false) // Flag to force player to draw after "Go Fish"
 
 // Selection flow state
 const selectionStep = computed(() => {
   if (!isMyTurn.value || gameOver.value) return 'waiting'
+  if (mustDrawCard.value) return 'must-draw'
   if (!selectedOpponent.value) return 'select-opponent'
   return 'select-card'
 })
@@ -66,6 +72,9 @@ const showGoFishSplash = ref(false)
 const showBookComplete = ref(false)
 const completedBookRank = ref('')
 const bookCompletePosition = ref({ x: 50, y: 50 })
+const showOctopusTroll = ref(false)
+const showDeckSwapTroll = ref(false)
+const showEarthquakeTroll = ref(false)
 
 // Camera & Gesture state
 const { stream, isEnabled: cameraEnabled, startCamera, stopCamera } = useCamera()
@@ -84,8 +93,7 @@ const isMyTurn = computed(() => currentTurnId.value === myId.value)
 const canDrawCard = computed(() =>
   isMyTurn.value &&
   deckCount.value > 0 &&
-  selectedCard.value === null &&
-  gameMessage.value.type === 'warning'
+  mustDrawCard.value
 )
 
 // Watch for turn changes
@@ -96,6 +104,7 @@ watch(isMyTurn, (myTurn) => {
     selectedOpponent.value = null
     selectedCard.value = null
     selectedRank.value = null
+    mustDrawCard.value = false
   }
 })
 
@@ -189,13 +198,15 @@ onMounted(() => {
 
     onTurnSkipped: (data) => {
       if (data.playerId === myId.value) {
+        const reason = data.reason === 'octopus_troll' ? 'trolled by the octopus' : 'penalty'
         gameMessage.value = {
-          text: `Your turn was SKIPPED as penalty!`,
+          text: `Your turn was SKIPPED (${reason})!`,
           type: 'warning'
         }
       } else {
+        const reason = data.reason === 'octopus_troll' ? 'trolled by the octopus' : ''
         gameMessage.value = {
-          text: `${data.playerName}'s turn was skipped!`,
+          text: `${data.playerName}'s turn was skipped${reason ? ' (' + reason + ')' : ''}!`,
           type: 'info'
         }
       }
@@ -205,6 +216,40 @@ onMounted(() => {
       gameMessage.value = {
         text: `${data.playerName} reconnected!`,
         type: 'success'
+      }
+    },
+
+    onOctopusTroll: (data) => {
+      // Show octopus animation ONLY for this player (server sends event only to trolled player)
+      // The black ink and "SKIPPED!" message will only appear on THIS player's screen
+      showOctopusTroll.value = true
+    },
+
+    onDeckSwapTroll: (data) => {
+      // Show deck swap animation to ALL players
+      showDeckSwapTroll.value = true
+      gameMessage.value = {
+        text: data.message || 'Deck Swap! Everyone\'s hands have been randomly swapped!',
+        type: 'warning'
+      }
+    },
+
+    onGameStateUpdate: (data) => {
+      // Game state has been updated after deck swap
+      // The useSocket composable already updates hand, players, and deckCount
+      // Just show a confirmation message
+      gameMessage.value = {
+        text: 'Your hand has been updated!',
+        type: 'info'
+      }
+    },
+
+    onEarthquakeTroll: (data) => {
+      // Show earthquake animation to ALL players
+      showEarthquakeTroll.value = true
+      gameMessage.value = {
+        text: data.message || 'Earthquake! The ground is shaking!',
+        type: 'warning'
       }
     }
   })
@@ -217,7 +262,13 @@ onUnmounted(() => {
 // Card selection
 function selectCard(card) {
   if (!isMyTurn.value || gameOver.value) return
-  
+
+  // If player must draw, prevent card selection
+  if (mustDrawCard.value) {
+    gameMessage.value = { text: 'You must draw a card from the deck first!', type: 'warning' }
+    return
+  }
+
   // Must select opponent first
   if (!selectedOpponent.value) {
     gameMessage.value = { text: 'First, click on a player to ask!', type: 'warning' }
@@ -227,7 +278,7 @@ function selectCard(card) {
   // Select the card and immediately ask
   selectedCard.value = card
   selectedRank.value = card.rank
-  
+
   // Immediately make the ask
   performAsk()
 }
@@ -238,7 +289,13 @@ function selectRank(rank) {
 
 function selectOpponentForAsk(opponentId) {
   if (!isMyTurn.value || gameOver.value) return
-  
+
+  // If player must draw, prevent opponent selection
+  if (mustDrawCard.value) {
+    gameMessage.value = { text: 'You must draw a card from the deck first!', type: 'warning' }
+    return
+  }
+
   if (selectedOpponent.value === opponentId) {
     // Deselect if clicking same opponent
     selectedOpponent.value = null
@@ -259,9 +316,11 @@ async function performAsk() {
     showGoFishSplash.value = true
     const opponent = opponents.value.find(o => o.id === selectedOpponent.value)
     gameMessage.value = {
-      text: `Go Fish! ${opponent?.name} doesn't have any ${selectedRank.value}s.`,
+      text: `Go Fish! ${opponent?.name} doesn't have any ${selectedRank.value}s. Draw a card from the deck!`,
       type: 'warning'
     }
+    // Set flag to force player to draw from deck
+    mustDrawCard.value = true
   }
 
   selectedCard.value = null
@@ -285,6 +344,8 @@ function cancelAsk() {
 async function handleDrawCard() {
   if (deckCount.value === 0 || !isMyTurn.value) return
   await drawCard()
+  // Reset the mustDrawCard flag after drawing
+  mustDrawCard.value = false
 }
 
 function onGoFishSplashComplete() {
@@ -293,6 +354,18 @@ function onGoFishSplashComplete() {
 
 function onBookCompleteEffectDone() {
   showBookComplete.value = false
+}
+
+function onOctopusTrollComplete() {
+  showOctopusTroll.value = false
+}
+
+function onDeckSwapTrollComplete() {
+  showDeckSwapTroll.value = false
+}
+
+function onEarthquakeTrollComplete() {
+  showEarthquakeTroll.value = false
 }
 
 // Camera functions
@@ -421,6 +494,9 @@ function handleLeaveGame() {
       :position="bookCompletePosition"
       @complete="onBookCompleteEffectDone"
     />
+    <TrollerOctopus v-if="showOctopusTroll" @complete="onOctopusTrollComplete" />
+    <DeckSwapTroll v-if="showDeckSwapTroll" @complete="onDeckSwapTrollComplete" />
+    <EarthquakeTroll v-if="showEarthquakeTroll" @complete="onEarthquakeTrollComplete" />
 
     <!-- Camera Permission Modal -->
     <CameraPermission
@@ -471,8 +547,10 @@ function handleLeaveGame() {
           :card-count="opp.cardCount"
           :is-current-turn="currentTurnId === opp.id"
           :is-selected="selectedOpponent === opp.id"
-          :is-selectable="isMyTurn && !gameOver"
+          :is-selectable="isMyTurn && !gameOver && !mustDrawCard"
           position="top"
+          :show-camera="showCameraFeed"
+          :camera-stream="stream"
           @select="selectOpponentForAsk(opp.id)"
         />
       </div>
@@ -678,6 +756,7 @@ function handleLeaveGame() {
   padding: 10px 20px;
   border: 3px solid #4fc3f7;
   box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.4);
+  flex-wrap: wrap;
 }
 
 .player-name {

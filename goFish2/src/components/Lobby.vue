@@ -112,7 +112,12 @@ async function handleJoinRoom() {
 
 async function handleStartGame() {
   if (players.value.length < 2) {
-    error.value = 'Need at least 2 players';
+    error.value = 'Need at least 2 players to start';
+    return;
+  }
+
+  if (players.value.length > 4) {
+    error.value = 'Maximum 4 players allowed';
     return;
   }
 
@@ -220,6 +225,7 @@ function handleClearSession() {
           <span class="room-label">ROOM CODE</span>
           <span class="room-code">{{ roomCode }}</span>
           <span class="room-hint">Share this code with friends!</span>
+          <span class="room-hint camera-hint">📹 Camera enabled for live feeds</span>
         </div>
 
         <div class="players-list">
@@ -238,6 +244,18 @@ function handleClearSession() {
             <span v-if="player.isYou" class="you-tag">YOU</span>
             <span v-if="players[0]?.id === player.id" class="host-tag">HOST</span>
           </div>
+        </div>
+
+        <div class="player-requirement">
+          <span v-if="players.length < 2" class="requirement-warning">
+            ⚠️ Need at least 2 players ({{ 2 - players.length }} more)
+          </span>
+          <span v-else-if="players.length >= 4" class="requirement-full">
+            ✓ Room full (4/4 players)
+          </span>
+          <span v-else class="requirement-ready">
+            ✓ Ready to start ({{ players.length }}/4 players)
+          </span>
         </div>
 
         <div class="waiting-actions">
@@ -490,6 +508,11 @@ function handleClearSession() {
   color: rgba(255, 255, 255, 0.5);
 }
 
+.room-hint.camera-hint {
+  color: #4fc3f7;
+  margin-top: 4px;
+}
+
 .players-list {
   background: rgba(0, 0, 0, 0.3);
   border: 2px solid #4fc3f7;
@@ -541,6 +564,27 @@ function handleClearSession() {
 .host-tag {
   background: #5dfc9a;
   color: #0a1628;
+}
+
+.player-requirement {
+  padding: 12px;
+  text-align: center;
+  font-size: 0.5rem;
+  border: 2px solid;
+  margin-bottom: 10px;
+}
+
+.requirement-warning {
+  color: #ff6b35;
+  border-color: #ff6b35;
+}
+
+.requirement-ready {
+  color: #5dfc9a;
+}
+
+.requirement-full {
+  color: #ffd700;
 }
 
 .waiting-actions {

@@ -18,6 +18,11 @@ const io = new Server(server, {
 const SUITS = ['♠', '♥', '♦', '♣'];
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 const BANNED_MOVES = ['SCRATCH_HEAD', 'TOUCH_FACE', 'COVER_MOUTH', 'LOOK_AWAY', 'RAISE_HANDS'];
+const MIN_PLAYERS = 2;
+const MAX_PLAYERS = 4;
+const OCTOPUS_TROLL_CHANCE = 0.15; // 15% chance per turn
+const DECK_SWAP_TROLL_CHANCE = 0.12; // 12% chance per turn
+const EARTHQUAKE_TROLL_CHANCE = 0.10; // 10% chance per turn
 
 // Game rooms storage
 const rooms = new Map();
@@ -189,6 +194,85 @@ function nextTurn(room) {
       continue;
     }
 
+    // Random octopus troller event (15% chance)
+    if (Math.random() < OCTOPUS_TROLL_CHANCE) {
+      // Notify only the affected player that they got trolled
+      io.to(nextPlayer.socketId).emit('octopus-troll', {
+        playerId: nextPlayer.id,
+        playerName: nextPlayer.name
+      });
+
+      // Notify everyone else that the player's turn was skipped (after animation)
+      setTimeout(() => {
+        io.to(room.code).emit('turn-skipped', {
+          playerId: nextPlayer.id,
+          playerName: nextPlayer.name,
+          reason: 'octopus_troll'
+        });
+      }, 3800); // Wait for octopus animation to complete
+
+      continue; // Skip to next player
+    }
+
+    // Random deck swap troller event (12% chance)
+    if (Math.random() < DECK_SWAP_TROLL_CHANCE && room.players.filter(p => p.connected).length >= 2) {
+      // Get all connected players
+      const connectedPlayers = room.players.filter(p => p.connected);
+
+      // Randomly shuffle the hands among connected players
+      const hands = connectedPlayers.map(p => p.hand);
+
+      // Fisher-Yates shuffle
+      for (let i = hands.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [hands[i], hands[j]] = [hands[j], hands[i]];
+      }
+
+      // Assign shuffled hands back to players
+      connectedPlayers.forEach((player, index) => {
+        player.hand = hands[index];
+        sortHand(player.hand);
+      });
+
+      // Create swap mapping for notification
+      const swapInfo = connectedPlayers.map((player, index) => ({
+        playerId: player.id,
+        playerName: player.name,
+        newHandCount: hands[index].length
+      }));
+
+      // Notify all players about the deck swap
+      io.to(room.code).emit('deck-swap-troll', {
+        players: swapInfo,
+        message: 'Deck Swap! Everyone\'s hands have been randomly swapped!'
+      });
+
+      // Update all clients with new game state
+      setTimeout(() => {
+        const publicPlayers = getPublicPlayerData(room.players, null);
+        room.players.forEach(player => {
+          if (player.socketId) {
+            io.to(player.socketId).emit('game-state-update', {
+              hand: player.hand,
+              players: publicPlayers,
+              deckCount: room.deck.length
+            });
+          }
+        });
+      }, 3500); // Wait for animation to complete
+    }
+
+    // Random earthquake troller event (10% chance)
+    if (Math.random() < EARTHQUAKE_TROLL_CHANCE && room.players.filter(p => p.connected).length >= 2) {
+      // Notify all players about the earthquake
+      io.to(room.code).emit('earthquake-troll', {
+        message: 'Earthquake! The ground is shaking!'
+      });
+
+      // Note: Earthquake doesn't affect game flow, just visual effect
+      // Players can continue playing during the earthquake animation
+    }
+
     break;
   } while (room.players.some(p => p.connected));
 }
@@ -238,8 +322,8 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if (room.players.length >= 4) {
-      callback({ success: false, error: 'Room is full' });
+    if (room.players.length >= MAX_PLAYERS) {
+      callback({ success: false, error: 'Room is full (max 4 players)' });
       return;
     }
 
@@ -358,8 +442,8 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if (room.players.length < 2) {
-      callback({ success: false, error: 'Need at least 2 players' });
+    if (room.players.length < MIN_PLAYERS) {
+      callback({ success: false, error: `Need at least ${MIN_PLAYERS} players` });
       return;
     }
 
