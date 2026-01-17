@@ -8,8 +8,5 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ],
-  "env": {
-    "VITE_SERVER_URL": "@vite_server_url"
-  }
+  ]
 }

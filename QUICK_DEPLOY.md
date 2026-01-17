@@ -49,17 +49,23 @@
    - Output Directory: `dist`
 
 ### Add environment variable
-5. Click **"Environment Variables"**
-6. Add variable:
+5. Go to **"Settings"** → **"Environment Variables"**
+6. Click **"Add New"**
+7. Add variable:
    ```
    Name: VITE_SERVER_URL
-   Value: https://gofish-server.onrender.com (your Render URL from step 1.9)
+   Value: https://gofish-server.onrender.com
    ```
-7. Check all environments: Production, Preview, Development
+   (Replace with your actual Render URL from step 1.9)
+8. Select all environments: ✓ Production  ✓ Preview  ✓ Development
+9. Click **"Save"**
 
-8. Click **"Deploy"**
-9. Wait 1-2 minutes
-10. **Copy your frontend URL** (e.g., `https://your-app.vercel.app`)
+10. Click **"Deploy"**
+11. Wait 1-2 minutes for initial deployment
+12. After first deployment completes, go to **"Deployments"** tab
+13. Click the three dots (...) on your latest deployment → **"Redeploy"**
+14. Wait for redeploy to complete (this applies the environment variable)
+15. **Copy your frontend URL** (e.g., `https://your-app.vercel.app`)
 
 ---
 
