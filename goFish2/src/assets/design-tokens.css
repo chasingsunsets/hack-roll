@@ -1,0 +1,134 @@
+/* ===========================================
+   GO FISH - DESIGN TOKENS
+   Pixel Art Ocean Theme
+   =========================================== */
+
+:root {
+  /* ========== OCEAN PALETTE ========== */
+  --ocean-abyss: #0a1628;
+  --ocean-deep: #0d2847;
+  --ocean-mid: #1a3a5c;
+  --ocean-light: #2a5a8c;
+  --ocean-surface: #3a7ab0;
+
+  /* ========== GOLD ACCENTS ========== */
+  --gold-bright: #ffd700;
+  --gold-dark: #cc8800;
+  --gold-light: #ffee88;
+  --gold-muted: #b8860b;
+
+  /* ========== FISH SUIT COLORS ========== */
+  /* Coral Fish - replaces Hearts */
+  --suit-coral: #ff6b35;
+  --suit-coral-light: #ff9a6c;
+  --suit-coral-dark: #cc4a1a;
+
+  /* Algae Fish - replaces Clubs */
+  --suit-algae: #81c784;
+  --suit-algae-light: #a5d6a7;
+  --suit-algae-dark: #4caf50;
+
+  /* Wave Fish - replaces Spades */
+  --suit-wave: #4fc3f7;
+  --suit-wave-light: #81d4fa;
+  --suit-wave-dark: #0288d1;
+
+  /* Pearl Fish - replaces Diamonds */
+  --suit-pearl: #f8bbd9;
+  --suit-pearl-light: #fce4ec;
+  --suit-pearl-dark: #f48fb1;
+
+  /* ========== FEEDBACK COLORS ========== */
+  --feedback-success: #5dfc9a;
+  --feedback-success-dark: #2a6a4a;
+  --feedback-success-bg: #1a4a2e;
+
+  --feedback-warning: #ff9a6c;
+  --feedback-warning-dark: #6a4a3a;
+  --feedback-warning-bg: #4a2a1a;
+
+  --feedback-info: #4fc3f7;
+  --feedback-info-dark: #2a5a8c;
+  --feedback-info-bg: #1a3a5c;
+
+  --feedback-action: #ffd700;
+  --feedback-action-dark: #6a5a3a;
+  --feedback-action-bg: #4a3a1a;
+
+  /* ========== CARD COLORS ========== */
+  --card-face-bg: #f8f4e8;
+  --card-face-gradient: linear-gradient(135deg, #f8f4e8 0%, #e8e4d8 100%);
+  --card-face-light: #ffffff;
+  --card-face-dark: #d4d0c4;
+  --card-border: #2c2c2c;
+  --card-text-dark: #1a1a2e;
+
+  --card-back-bg: var(--ocean-mid);
+  --card-back-light: var(--ocean-light);
+  --card-back-dark: var(--ocean-deep);
+  --card-back-border: var(--ocean-abyss);
+
+  /* ========== UI PANEL COLORS ========== */
+  --panel-bg: rgba(0, 0, 0, 0.4);
+  --panel-bg-hover: rgba(0, 0, 0, 0.5);
+  --panel-border: rgba(255, 255, 255, 0.2);
+  --panel-border-hover: rgba(255, 255, 255, 0.5);
+  --panel-border-active: var(--gold-bright);
+
+  /* ========== TYPOGRAPHY ========== */
+  --font-pixel: 'Press Start 2P', monospace;
+  --font-mono: 'Courier New', monospace;
+
+  /* ========== SPACING (Pixel-aligned) ========== */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ========== BORDERS (Pixel-perfect) ========== */
+  --border-thin: 2px;
+  --border-medium: 3px;
+  --border-thick: 4px;
+  --border-heavy: 6px;
+
+  /* ========== SHADOWS (Pixel-style) ========== */
+  --shadow-sm: 2px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 4px 4px 0 rgba(0, 0, 0, 0.4);
+  --shadow-lg: 6px 6px 0 rgba(0, 0, 0, 0.4);
+  --shadow-xl: 8px 8px 0 rgba(0, 0, 0, 0.5);
+  --shadow-2xl: 12px 12px 0 rgba(0, 0, 0, 0.5);
+
+  /* ========== INSET SHADOWS (3D effect) ========== */
+  --inset-light: inset 2px 2px 0;
+  --inset-dark: inset -2px -2px 0;
+  --inset-light-md: inset 3px 3px 0;
+  --inset-dark-md: inset -3px -3px 0;
+  --inset-light-lg: inset 4px 4px 0;
+  --inset-dark-lg: inset -4px -4px 0;
+
+  /* ========== CARD DIMENSIONS ========== */
+  --card-width: 90px;
+  --card-height: 130px;
+  --card-width-sm: 56px;
+  --card-height-sm: 80px;
+
+  /* ========== Z-INDEX ========== */
+  --z-background: -1;
+  --z-cards: 1;
+  --z-cards-hover: 10;
+  --z-ui: 100;
+  --z-modal: 1000;
+  --z-effects: 2000;
+}
+
+/* ========== DARK MODE ADJUSTMENTS ========== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+}

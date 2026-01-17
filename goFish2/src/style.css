@@ -1,22 +1,41 @@
+/* ===========================================
+   GO FISH - GLOBAL STYLES
+   Pixel Art Ocean Theme
+   =========================================== */
+
+/* Import design system */
+@import url('./assets/design-tokens.css');
+@import url('./assets/animations.css');
+
+/* Import pixel font globally */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+/* ========== RESET & BASE ========== */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+/* Pixel-perfect rendering */
+*,
+*::before,
+*::after {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+}
+
 :root {
-  font-family: 'Segoe UI', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: var(--font-pixel);
   line-height: 1.5;
   font-weight: 400;
-
   color-scheme: dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #1a1a2e;
-
+  background-color: var(--ocean-abyss);
   font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeSpeed;
 }
 
 body {
@@ -24,6 +43,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   overflow-x: hidden;
+  background: var(--ocean-abyss);
 }
 
 #app {
@@ -31,44 +51,243 @@ body {
   min-height: 100vh;
 }
 
+/* ========== PIXEL-PERFECT UTILITIES ========== */
+.pixel-border {
+  border-style: solid;
+  border-radius: 0 !important;
+}
+
+.pixel-shadow {
+  box-shadow: var(--shadow-md);
+}
+
+.pixel-inset {
+  box-shadow:
+    var(--inset-dark-md) rgba(0, 0, 0, 0.3),
+    var(--inset-light-md) rgba(255, 255, 255, 0.1);
+}
+
+/* Remove all border-radius globally for pixel aesthetic */
+.no-radius,
+.pixel-card,
+.pixel-btn,
+.pixel-panel,
+.pixel-message {
+  border-radius: 0 !important;
+}
+
+/* ========== BUTTONS ========== */
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
+  border-radius: 0;
+  border: none;
   padding: 0.6em 1.2em;
   font-size: 1em;
   font-weight: 500;
-  font-family: inherit;
+  font-family: var(--font-pixel);
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: transform 0.1s steps(2), box-shadow 0.1s steps(2);
 }
 
 button:focus,
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: var(--border-medium) solid var(--gold-bright);
+  outline-offset: 2px;
 }
 
-/* Scrollbar styling */
+/* Primary pixel button */
+.pixel-btn {
+  padding: var(--space-3) var(--space-6);
+  background: var(--suit-coral);
+  border: none;
+  color: white;
+  font-family: var(--font-pixel);
+  font-size: 0.7rem;
+  cursor: pointer;
+  position: relative;
+  box-shadow:
+    var(--inset-dark-lg) var(--suit-coral-dark),
+    var(--inset-light-lg) var(--suit-coral-light),
+    var(--shadow-lg);
+}
+
+.pixel-btn:hover {
+  transform: translate(2px, 2px);
+  box-shadow:
+    var(--inset-dark-lg) var(--suit-coral-dark),
+    var(--inset-light-lg) var(--suit-coral-light),
+    var(--shadow-sm);
+}
+
+.pixel-btn:active {
+  transform: translate(4px, 4px);
+  box-shadow:
+    var(--inset-dark-lg) var(--suit-coral-dark),
+    var(--inset-light-lg) var(--suit-coral-light),
+    2px 2px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* Secondary pixel button */
+.pixel-btn-secondary {
+  padding: var(--space-3) var(--space-5);
+  background: #4a4a4a;
+  border: none;
+  color: white;
+  font-family: var(--font-pixel);
+  font-size: 0.6rem;
+  cursor: pointer;
+  box-shadow:
+    var(--inset-dark-md) #2a2a2a,
+    var(--inset-light-md) #6a6a6a,
+    var(--shadow-md);
+}
+
+.pixel-btn-secondary:hover {
+  transform: translate(1px, 1px);
+  box-shadow:
+    var(--inset-dark-md) #2a2a2a,
+    var(--inset-light-md) #6a6a6a,
+    var(--shadow-sm);
+}
+
+/* Small pixel button */
+.pixel-btn-small {
+  padding: var(--space-2) var(--space-3);
+  background: var(--panel-bg);
+  border: var(--border-medium) solid var(--panel-border);
+  color: white;
+  font-size: 0.7rem;
+  font-family: var(--font-pixel);
+  cursor: pointer;
+  transition: all 0.1s steps(2);
+}
+
+.pixel-btn-small:hover {
+  border-color: var(--panel-border-hover);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.pixel-btn-small.selected {
+  background: var(--suit-coral);
+  border-color: var(--gold-bright);
+  box-shadow:
+    var(--inset-dark) var(--suit-coral-dark),
+    var(--inset-light) var(--suit-coral-light);
+}
+
+/* ========== PANELS ========== */
+.pixel-panel {
+  background: var(--ocean-mid);
+  border: var(--border-heavy) solid var(--gold-bright);
+  box-shadow:
+    var(--inset-dark-lg) var(--ocean-deep),
+    var(--inset-light-lg) var(--ocean-light),
+    var(--shadow-2xl);
+}
+
+.pixel-panel-dark {
+  background: var(--panel-bg);
+  border: var(--border-medium) solid var(--panel-border);
+  box-shadow: var(--shadow-md);
+}
+
+/* ========== SCROLLBAR STYLING ========== */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  background: var(--ocean-deep);
+  border: 2px solid var(--ocean-mid);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
+  background: var(--ocean-light);
+  border: 2px solid var(--ocean-mid);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--gold-dark);
 }
 
-/* Selection color */
+::-webkit-scrollbar-corner {
+  background: var(--ocean-deep);
+}
+
+/* ========== SELECTION COLOR ========== */
 ::selection {
-  background: rgba(255, 107, 53, 0.4);
+  background: rgba(255, 107, 53, 0.6);
   color: #fff;
 }
+
+/* ========== TYPOGRAPHY ========== */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-pixel);
+  font-weight: normal;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* Gold title style */
+.pixel-title {
+  color: var(--gold-bright);
+  text-shadow:
+    4px 4px 0 var(--gold-dark),
+    -2px -2px 0 var(--gold-light);
+  letter-spacing: 4px;
+}
+
+/* ========== CARD BASE STYLES ========== */
+.card,
+.pixel-card {
+  border-radius: 0 !important;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* ========== RESPONSIVE FONT SCALING ========== */
+@media (max-width: 768px) {
+  :root {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    font-size: 12px;
+  }
+}
+
+/* ========== ACCESSIBILITY ========== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Focus visible for keyboard navigation */
+:focus-visible {
+  outline: var(--border-medium) solid var(--gold-bright);
+  outline-offset: 2px;
+}
+
+/* ========== UTILITY CLASSES ========== */
+.text-gold { color: var(--gold-bright); }
+.text-coral { color: var(--suit-coral); }
+.text-algae { color: var(--suit-algae); }
+.text-wave { color: var(--suit-wave); }
+.text-pearl { color: var(--suit-pearl); }
+.text-success { color: var(--feedback-success); }
+.text-warning { color: var(--feedback-warning); }
+.text-info { color: var(--feedback-info); }
+
+.bg-ocean-deep { background: var(--ocean-deep); }
+.bg-ocean-mid { background: var(--ocean-mid); }
+.bg-panel { background: var(--panel-bg); }
+
+.border-gold { border-color: var(--gold-bright); }
+.border-coral { border-color: var(--suit-coral); }
+.border-wave { border-color: var(--suit-wave); }
