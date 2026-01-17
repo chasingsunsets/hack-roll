@@ -22,14 +22,32 @@ defineProps({
   isCurrentTurn: {
     type: Boolean,
     default: false
+  },
+  isSelected: {
+    type: Boolean,
+    default: false
+  },
+  isSelectable: {
+    type: Boolean,
+    default: false
   }
 })
 
+const emit = defineEmits(['select'])
+
 const fishColors = { 'Bot 1': 'blue', 'Bot 2': 'green', 'Bot 3': 'pink' }
+
+function handleClick() {
+  emit('select')
+}
 </script>
 
 <template>
-  <div class="opponent-hand pixel-panel" :class="[position, { 'current-turn': isCurrentTurn }]">
+  <div 
+    class="opponent-hand pixel-panel" 
+    :class="[position, { 'current-turn': isCurrentTurn, 'selected': isSelected, 'selectable': isSelectable }]"
+    @click="handleClick"
+  >
     <div class="opponent-info">
       <div class="avatar">
         <PixelFish :size="24" :color="fishColors[name] || 'blue'" />
@@ -88,6 +106,33 @@ const fishColors = { 'Bot 1': 'blue', 'Bot 2': 'green', 'Bot 3': 'pink' }
 .opponent-hand.current-turn {
   border-color: #ffd700;
   background: rgba(255, 215, 0, 0.1);
+}
+
+.opponent-hand.selectable {
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.opponent-hand.selectable:hover {
+  transform: scale(1.05);
+  border-color: #4fc3f7;
+  box-shadow: 0 0 20px rgba(79, 195, 247, 0.4);
+}
+
+.opponent-hand.selected {
+  border-color: #5dfc9a !important;
+  background: rgba(93, 252, 154, 0.15);
+  box-shadow: 0 0 25px rgba(93, 252, 154, 0.5), inset 0 0 15px rgba(93, 252, 154, 0.1);
+  animation: selected-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes selected-pulse {
+  0%, 100% {
+    box-shadow: 0 0 25px rgba(93, 252, 154, 0.5), inset 0 0 15px rgba(93, 252, 154, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(93, 252, 154, 0.7), inset 0 0 20px rgba(93, 252, 154, 0.2);
+  }
 }
 
 .opponent-info {

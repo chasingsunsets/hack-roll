@@ -5,7 +5,6 @@ import OpponentHand from './OpponentHand.vue'
 import DrawPile from './DrawPile.vue'
 import BookPile from './BookPile.vue'
 import GameMessage from './GameMessage.vue'
-import AskRankModal from './AskRankModal.vue'
 import PixelBackground from './PixelBackground.vue'
 import PixelFish from './PixelFish.vue'
 import GoFishSplash from './GoFishSplash.vue'
@@ -52,9 +51,15 @@ const {
 // Local UI state
 const selectedCard = ref(null)
 const gameMessage = ref({ text: 'Game started! Wait for your turn.', type: 'info' })
-const showAskModal = ref(false)
 const selectedRank = ref(null)
 const selectedOpponent = ref(null)
+
+// Selection flow state
+const selectionStep = computed(() => {
+  if (!isMyTurn.value || gameOver.value) return 'waiting'
+  if (!selectedOpponent.value) return 'select-opponent'
+  return 'select-card'
+})
 
 // Visual effects state
 const showGoFishSplash = ref(false)
@@ -76,20 +81,6 @@ const myPlayer = computed(() => players.value.find(p => p.isYou))
 const opponents = computed(() => players.value.filter(p => !p.isYou))
 const isMyTurn = computed(() => currentTurnId.value === myId.value)
 
-const playerRanks = computed(() => {
-  const ranks = [...new Set(hand.value.map(card => card.rank))]
-  const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
-  return ranks.sort((a, b) => RANKS.indexOf(a) - RANKS.indexOf(b))
-})
-
-const opponentData = computed(() =>
-  opponents.value.map(opp => ({
-    name: opp.name,
-    cardCount: opp.cardCount,
-    id: opp.id
-  }))
-)
-
 const canDrawCard = computed(() =>
   isMyTurn.value &&
   deckCount.value > 0 &&
@@ -100,7 +91,11 @@ const canDrawCard = computed(() =>
 // Watch for turn changes
 watch(isMyTurn, (myTurn) => {
   if (myTurn) {
-    gameMessage.value = { text: 'Your turn! Select a card to ask for.', type: 'action' }
+    gameMessage.value = { text: 'Your turn! Click on a player to ask.', type: 'action' }
+    // Reset selection when turn starts
+    selectedOpponent.value = null
+    selectedCard.value = null
+    selectedRank.value = null
   }
 })
 
@@ -108,7 +103,7 @@ watch(isMyTurn, (myTurn) => {
 onMounted(() => {
   // Set initial message based on whether it's our turn
   if (isMyTurn.value) {
-    gameMessage.value = { text: 'Your turn! Select a card to ask for.', type: 'action' }
+    gameMessage.value = { text: 'Your turn! Click on a player to ask.', type: 'action' }
   } else {
     gameMessage.value = { text: 'Waiting for other players...', type: 'info' }
   }
@@ -223,29 +218,41 @@ onUnmounted(() => {
 // Card selection
 function selectCard(card) {
   if (!isMyTurn.value || gameOver.value) return
-
-  if (selectedCard.value && selectedCard.value.suit === card.suit && selectedCard.value.rank === card.rank) {
-    selectedCard.value = null
-    selectedRank.value = null
-  } else {
-    selectedCard.value = card
-    selectedRank.value = card.rank
-    showAskModal.value = true
+  
+  // Must select opponent first
+  if (!selectedOpponent.value) {
+    gameMessage.value = { text: 'First, click on a player to ask!', type: 'warning' }
+    return
   }
+
+  // Select the card and immediately ask
+  selectedCard.value = card
+  selectedRank.value = card.rank
+  
+  // Immediately make the ask
+  performAsk()
 }
 
 function selectRank(rank) {
   selectedRank.value = rank
 }
 
-function selectOpponentForAsk(id) {
-  selectedOpponent.value = id
+function selectOpponentForAsk(opponentId) {
+  if (!isMyTurn.value || gameOver.value) return
+  
+  if (selectedOpponent.value === opponentId) {
+    // Deselect if clicking same opponent
+    selectedOpponent.value = null
+    gameMessage.value = { text: 'Your turn! Click on a player to ask.', type: 'action' }
+  } else {
+    selectedOpponent.value = opponentId
+    const opponent = opponents.value.find(o => o.id === opponentId)
+    gameMessage.value = { text: `Asking ${opponent?.name}. Now click a card to ask for!`, type: 'action' }
+  }
 }
 
-async function confirmAsk() {
+async function performAsk() {
   if (!selectedRank.value || !selectedOpponent.value) return
-
-  showAskModal.value = false
 
   const result = await askForCards(selectedOpponent.value, selectedRank.value)
 
@@ -263,11 +270,17 @@ async function confirmAsk() {
   selectedOpponent.value = null
 }
 
+async function confirmAsk() {
+  await performAsk()
+}
+
 function cancelAsk() {
-  showAskModal.value = false
   selectedCard.value = null
   selectedRank.value = null
   selectedOpponent.value = null
+  if (isMyTurn.value) {
+    gameMessage.value = { text: 'Your turn! Click on a player to ask.', type: 'action' }
+  }
 }
 
 async function handleDrawCard() {
@@ -458,7 +471,10 @@ function handleLeaveGame() {
           :name="opp.name"
           :card-count="opp.cardCount"
           :is-current-turn="currentTurnId === opp.id"
+          :is-selected="selectedOpponent === opp.id"
+          :is-selectable="isMyTurn && !gameOver"
           position="top"
+          @select="selectOpponentForAsk(opp.id)"
         />
       </div>
 
@@ -506,19 +522,6 @@ function handleLeaveGame() {
         </div>
       </div>
     </div>
-
-    <!-- Ask modal -->
-    <AskRankModal
-      :show="showAskModal"
-      :available-ranks="playerRanks"
-      :opponents="opponentData"
-      :selected-rank="selectedRank"
-      :selected-opponent="selectedOpponent"
-      @select-rank="selectRank"
-      @select-opponent="selectOpponentForAsk"
-      @confirm="confirmAsk"
-      @cancel="cancelAsk"
-    />
 
     <!-- Game over overlay -->
     <div v-if="gameOver" class="game-over-overlay">
