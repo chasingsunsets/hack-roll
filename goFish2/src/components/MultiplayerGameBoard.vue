@@ -12,6 +12,8 @@ import BookCompleteEffect from './BookCompleteEffect.vue'
 import TrollerOctopus from './TrollerOctopus.vue'
 import DeckSwapTroll from './DeckSwapTroll.vue'
 import EarthquakeTroll from './EarthquakeTroll.vue'
+import SoundControls from './SoundControls.vue'
+import TauntMessage from './TauntMessage.vue'
 
 // Camera & Gesture Detection
 import CameraFeed from './camera/CameraFeed.vue'
@@ -21,6 +23,8 @@ import PlayerCameraFeed from './camera/PlayerCameraFeed.vue'
 import { useCamera } from '../composables/useCamera'
 import { useGestureDetection } from '../composables/useGestureDetection'
 import { useSocket } from '../composables/useSocket'
+import { useSoundEffects } from '../composables/useSoundEffects'
+import { useWebRTC } from '../composables/useWebRTC'
 import { BANNED_MOVES } from '../services/gestureDefinitions'
 
 const props = defineProps({
@@ -49,8 +53,19 @@ const {
   reportBannedMove,
   reportGesture,
   setEventHandlers,
-  disconnect
+  disconnect,
+  socket
 } = useSocket()
+
+// WebRTC for peer-to-peer video
+const {
+  remoteStreams,
+  initializeWebRTC,
+  connectToPeers,
+  getRemoteStream,
+  setupSignaling,
+  cleanupAllPeerConnections
+} = useWebRTC(socket, myId)
 
 // Local UI state
 const selectedCard = ref(null)
@@ -75,6 +90,30 @@ const bookCompletePosition = ref({ x: 50, y: 50 })
 const showOctopusTroll = ref(false)
 const showDeckSwapTroll = ref(false)
 const showEarthquakeTroll = ref(false)
+const showTauntMessage = ref(false)
+
+// Sound effects
+const {
+  playAskCard,
+  playCardReceived,
+  playGoFish,
+  playGoFishTaunt,
+  playWrongGuessTaunt,
+  playDrawCard,
+  playBookComplete,
+  playTurnChange,
+  playYourTurn,
+  playWin,
+  playLose,
+  playOctopusTroll,
+  playEarthquake,
+  playDeckSwap,
+  playClick,
+  initAudio,
+  isEnabled: soundEnabled,
+  toggleSound,
+  setVolume
+} = useSoundEffects()
 
 // Camera & Gesture state
 const { stream, isEnabled: cameraEnabled, startCamera, stopCamera } = useCamera()
@@ -99,17 +138,34 @@ const canDrawCard = computed(() =>
 // Watch for turn changes
 watch(isMyTurn, (myTurn) => {
   if (myTurn) {
+    playYourTurn()
     gameMessage.value = { text: 'Your turn! Click on a player to ask.', type: 'action' }
     // Reset selection when turn starts
     selectedOpponent.value = null
     selectedCard.value = null
     selectedRank.value = null
     mustDrawCard.value = false
+  } else {
+    playTurnChange()
+  }
+})
+
+// Watch for game over
+watch(gameOver, (isOver) => {
+  if (isOver && winner.value) {
+    if (winner.value === myId.value) {
+      playWin()
+    } else {
+      playLose()
+    }
   }
 })
 
 // Socket event handlers
 onMounted(() => {
+  // Initialize audio context on first user interaction
+  initAudio()
+
   // Set initial message based on whether it's our turn
   if (isMyTurn.value) {
     gameMessage.value = { text: 'Your turn! Click on a player to ask.', type: 'action' }
@@ -119,6 +175,8 @@ onMounted(() => {
 
   setEventHandlers({
     onCardsTransferred: (data) => {
+      playCardReceived()
+
       if (data.toPlayerId === myId.value) {
         gameMessage.value = {
           text: `You got ${data.count} ${data.rank}(s)! Ask again!`,
@@ -140,12 +198,15 @@ onMounted(() => {
       }
 
       if (data.completedBooks?.length > 0) {
+        playBookComplete()
         completedBookRank.value = data.completedBooks[0]
         showBookComplete.value = true
       }
     },
 
     onCardDrawn: (data) => {
+      playDrawCard()
+
       if (data.playerId === myId.value) {
         if (data.drawnCard) {
           gameMessage.value = {
@@ -162,6 +223,7 @@ onMounted(() => {
       }
 
       if (data.completedBooks?.length > 0) {
+        playBookComplete()
         completedBookRank.value = data.completedBooks[0]
         showBookComplete.value = true
       }
@@ -222,11 +284,13 @@ onMounted(() => {
     onOctopusTroll: (data) => {
       // Show octopus animation ONLY for this player (server sends event only to trolled player)
       // The black ink and "SKIPPED!" message will only appear on THIS player's screen
+      playOctopusTroll()
       showOctopusTroll.value = true
     },
 
     onDeckSwapTroll: (data) => {
       // Show deck swap animation to ALL players
+      playDeckSwap()
       showDeckSwapTroll.value = true
       gameMessage.value = {
         text: data.message || 'Deck Swap! Everyone\'s hands have been randomly swapped!',
@@ -246,6 +310,7 @@ onMounted(() => {
 
     onEarthquakeTroll: (data) => {
       // Show earthquake animation to ALL players
+      playEarthquake()
       showEarthquakeTroll.value = true
       gameMessage.value = {
         text: data.message || 'Earthquake! The ground is shaking!',
@@ -257,6 +322,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   disableCamera()
+  cleanupAllPeerConnections()
 })
 
 // Card selection
@@ -310,10 +376,20 @@ function selectOpponentForAsk(opponentId) {
 async function performAsk() {
   if (!selectedRank.value || !selectedOpponent.value) return
 
+  playAskCard()
   const result = await askForCards(selectedOpponent.value, selectedRank.value)
 
   if (result.goFish) {
+    // Play taunting sounds when player guesses wrong!
+    playGoFish()
+    setTimeout(() => {
+      playWrongGuessTaunt()
+    }, 600)
+
+    // Show taunt message
+    showTauntMessage.value = true
     showGoFishSplash.value = true
+
     const opponent = opponents.value.find(o => o.id === selectedOpponent.value)
     gameMessage.value = {
       text: `Go Fish! ${opponent?.name} doesn't have any ${selectedRank.value}s. Draw a card from the deck!`,
@@ -368,6 +444,10 @@ function onEarthquakeTrollComplete() {
   showEarthquakeTroll.value = false
 }
 
+function onTauntMessageComplete() {
+  showTauntMessage.value = false
+}
+
 // Camera functions
 async function enableCamera() {
   showCameraPermission.value = false
@@ -394,6 +474,18 @@ async function enableCamera() {
       startDetection(videoEl, onGestureDetected)
     } else {
       console.log('Cannot start detection - gestureReady:', gestureReady.value, 'cameraEnabled:', cameraEnabled.value)
+    }
+
+    // Initialize WebRTC with camera stream
+    if (stream.value) {
+      console.log('[WebRTC] Initializing with camera stream')
+      await initializeWebRTC(stream.value)
+      setupSignaling()
+
+      // Connect to all peers in the room
+      const peerIds = players.value.map(p => p.id)
+      await connectToPeers(peerIds)
+      console.log('[WebRTC] Connected to peers')
     }
   } else {
     console.log('No camera feed ref!')
@@ -498,6 +590,10 @@ function handleLeaveGame() {
     <DeckSwapTroll v-if="showDeckSwapTroll" @complete="onDeckSwapTrollComplete" />
     <EarthquakeTroll v-if="showEarthquakeTroll" @complete="onEarthquakeTrollComplete" />
 
+    <!-- Sound Controls -->
+    <SoundControls />
+    <TauntMessage v-if="showTauntMessage" @complete="onTauntMessageComplete" />
+
     <!-- Camera Permission Modal -->
     <CameraPermission
       v-if="showCameraPermission"
@@ -549,8 +645,8 @@ function handleLeaveGame() {
           :is-selected="selectedOpponent === opp.id"
           :is-selectable="isMyTurn && !gameOver && !mustDrawCard"
           position="top"
-          :show-camera="showCameraFeed"
-          :camera-stream="stream"
+          :show-camera="showCameraFeed && getRemoteStream(opp.id) !== null"
+          :camera-stream="getRemoteStream(opp.id)"
           @select="selectOpponentForAsk(opp.id)"
         />
       </div>
@@ -587,9 +683,6 @@ function handleLeaveGame() {
             <span class="player-name">YOUR HAND</span>
             <span class="card-count-badge">{{ hand.length }} cards</span>
             <span v-if="isMyTurn" class="turn-indicator">YOUR TURN!</span>
-            <span v-if="myBannedMove" class="banned-move-badge" :title="'Don\'t do this!'">
-              AVOID: {{ BANNED_MOVES[myBannedMove]?.name || myBannedMove }}
-            </span>
           </div>
           <PlayerHand
             :cards="hand"
@@ -781,19 +874,6 @@ function handleLeaveGame() {
   animation: pulse 1s ease-in-out infinite;
 }
 
-.banned-move-badge {
-  background: #ff4444;
-  color: #fff;
-  padding: 6px 12px;
-  font-size: 0.45rem;
-  border: 2px solid #ff6666;
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
 
 .game-over-overlay {
   position: fixed;

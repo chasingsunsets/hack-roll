@@ -764,6 +764,52 @@ io.on('connection', (socket) => {
       }
     }
   });
+
+  // WebRTC signaling events
+  socket.on('webrtc-offer', ({ to, offer }) => {
+    const room = Array.from(rooms.values()).find(r =>
+      r.players.some(p => p.socketId === socket.id)
+    )
+    if (room) {
+      const targetPlayer = room.players.find(p => p.id === to)
+      if (targetPlayer && targetPlayer.socketId) {
+        io.to(targetPlayer.socketId).emit('webrtc-offer', {
+          from: socket.sessionId,
+          offer
+        })
+      }
+    }
+  })
+
+  socket.on('webrtc-answer', ({ to, answer }) => {
+    const room = Array.from(rooms.values()).find(r =>
+      r.players.some(p => p.socketId === socket.id)
+    )
+    if (room) {
+      const targetPlayer = room.players.find(p => p.id === to)
+      if (targetPlayer && targetPlayer.socketId) {
+        io.to(targetPlayer.socketId).emit('webrtc-answer', {
+          from: socket.sessionId,
+          answer
+        })
+      }
+    }
+  })
+
+  socket.on('webrtc-ice-candidate', ({ to, candidate }) => {
+    const room = Array.from(rooms.values()).find(r =>
+      r.players.some(p => p.socketId === socket.id)
+    )
+    if (room) {
+      const targetPlayer = room.players.find(p => p.id === to)
+      if (targetPlayer && targetPlayer.socketId) {
+        io.to(targetPlayer.socketId).emit('webrtc-ice-candidate', {
+          from: socket.sessionId,
+          candidate
+        })
+      }
+    }
+  })
 });
 
 const PORT = process.env.PORT || 3001;
