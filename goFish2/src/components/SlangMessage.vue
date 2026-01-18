@@ -9,6 +9,10 @@ const props = defineProps({
   slangText: {
     type: String,
     required: true
+  },
+  audioFile: {
+    type: String,
+    default: null
   }
 })
 
@@ -17,8 +21,8 @@ const emit = defineEmits(['complete'])
 const phase = ref('entering') // entering, showing, exiting
 
 onMounted(async () => {
-  // Speak the slang text using Web Speech API
-  speakText(props.slangText)
+  // Play the recorded audio file
+  playAudio(props.audioFile)
 
   // Phase 1: Enter
   await delay(100)
@@ -33,8 +37,28 @@ onMounted(async () => {
   emit('complete')
 })
 
+function playAudio(audioFileName) {
+  if (!audioFileName) {
+    // Fallback to speech synthesis if no audio file
+    speakText(props.slangText)
+    return
+  }
+
+  try {
+    const audio = new Audio(`/audio/slang/${audioFileName}`)
+    audio.volume = 1.0
+    audio.play().catch(err => {
+      console.warn('Failed to play audio, falling back to speech:', err)
+      speakText(props.slangText)
+    })
+  } catch (err) {
+    console.warn('Audio error, falling back to speech:', err)
+    speakText(props.slangText)
+  }
+}
+
 function speakText(text) {
-  // Check if browser supports Speech Synthesis
+  // Fallback: Check if browser supports Speech Synthesis
   if ('speechSynthesis' in window) {
     const utterance = new SpeechSynthesisUtterance(text)
 

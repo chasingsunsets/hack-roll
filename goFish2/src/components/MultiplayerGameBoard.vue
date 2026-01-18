@@ -96,7 +96,7 @@ const showDeckSwapTroll = ref(false)
 const showEarthquakeTroll = ref(false)
 const showTauntMessage = ref(false)
 const showSlangMessage = ref(false)
-const currentSlangMessage = ref({ playerName: '', slangText: '' })
+const currentSlangMessage = ref({ playerName: '', slangText: '', audioFile: null })
 
 // Sound effects
 const {
@@ -352,10 +352,11 @@ onMounted(() => {
     },
 
     onSlangCommentBroadcast: (data) => {
-      // Show slang message with text-to-speech
+      // Show slang message with recorded audio
       currentSlangMessage.value = {
         playerName: data.playerName,
-        slangText: data.slangText
+        slangText: data.slangText,
+        audioFile: data.audioFile
       }
       showSlangMessage.value = true
     }
@@ -610,8 +611,9 @@ function onBannedMoveAlertClose() {
   currentPenalty.value = null
 }
 
-async function handleSlangClick(slangText) {
-  await sendSlangComment(slangText)
+async function handleSlangClick(slangData) {
+  // slangData is now { text, audio } from SinglishButtons
+  await sendSlangComment(slangData)
 }
 
 function onSlangMessageComplete() {
@@ -649,6 +651,7 @@ function handleLeaveGame() {
       v-if="showSlangMessage"
       :player-name="currentSlangMessage.playerName"
       :slang-text="currentSlangMessage.slangText"
+      :audio-file="currentSlangMessage.audioFile"
       @complete="onSlangMessageComplete"
     />
     <SinglishButtons @slang-clicked="handleSlangClick" />

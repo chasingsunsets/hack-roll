@@ -306,9 +306,9 @@ export function useSocket() {
     });
   }
 
-  function sendSlangComment(slangText) {
+  function sendSlangComment(slangData) {
     return new Promise((resolve) => {
-      socket.value.emit('slang-comment', roomCode.value, slangText, (response) => {
+      socket.value.emit('slang-comment', roomCode.value, slangData, (response) => {
         resolve(response);
       });
     });

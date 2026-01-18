@@ -3,15 +3,16 @@ import { ref } from 'vue'
 
 const emit = defineEmits(['slang-clicked'])
 
+// Each slang has a text, icon, and audio file name
 const slangs = [
-  { text: 'Walao eh!', icon: '😤' },
-  { text: 'Alamak!', icon: '😱' },
-  { text: 'Aiyo!', icon: '😩' },
-  { text: 'Wah lau!', icon: '😮' },
-  { text: 'Shiok ah!', icon: '😋' },
-  { text: 'Can lah!', icon: '👍' },
-  { text: 'Paiseh leh!', icon: '😅' },
-  { text: 'Sian diao!', icon: '😑' }
+  { text: 'Walao eh!', icon: '😤', audio: 'walao-eh.mp3' },
+  { text: 'Alamak!', icon: '😱', audio: 'alamak.mp3' },
+  { text: 'Aiyo!', icon: '😩', audio: 'aiyo.mp3' },
+  { text: 'Wah lau!', icon: '😮', audio: 'wah-lau.mp3' },
+  { text: 'Shiok ah!', icon: '😋', audio: 'shiok-ah.mp3' },
+  { text: 'Can lah!', icon: '👍', audio: 'can-lah.mp3' },
+  { text: 'Paiseh leh!', icon: '😅', audio: 'paiseh-leh.mp3' },
+  { text: 'Sian!', icon: '😑', audio: 'sian.mp3' }
 ]
 
 const cooldown = ref(false)
@@ -19,7 +20,8 @@ const cooldown = ref(false)
 function handleSlangClick(slang) {
   if (cooldown.value) return
 
-  emit('slang-clicked', slang.text)
+  // Emit slang with audio file info
+  emit('slang-clicked', { text: slang.text, audio: slang.audio })
 
   // Cooldown to prevent spam
   cooldown.value = true

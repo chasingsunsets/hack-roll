@@ -716,7 +716,7 @@ io.on('connection', (socket) => {
   });
 
   // Singlish slang comment
-  socket.on('slang-comment', (roomCode, slangText, callback) => {
+  socket.on('slang-comment', (roomCode, slangData, callback) => {
     const room = rooms.get(roomCode);
 
     if (!room || !room.gameStarted) {
@@ -731,11 +731,16 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Support both old format (string) and new format (object with text and audio)
+    const slangText = typeof slangData === 'string' ? slangData : slangData.text;
+    const audioFile = typeof slangData === 'object' ? slangData.audio : null;
+
     // Broadcast the slang comment to all players in the room
     io.to(room.code).emit('slang-comment-broadcast', {
       playerId: player.id,
       playerName: player.name,
-      slangText: slangText
+      slangText: slangText,
+      audioFile: audioFile
     });
 
     callback({ success: true });
