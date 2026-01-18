@@ -43,6 +43,24 @@ async function attachStream(stream, retryCount = 0) {
     return
   }
 
+  // Set up track event listeners for mute/unmute
+  videoTracks.forEach(track => {
+    track.onunmute = () => {
+      console.log(`[PlayerCameraFeed] Track unmuted for ${props.playerName}`)
+      // Try to play when track unmutes
+      if (videoEl.value) {
+        videoEl.value.play().catch(err => {
+          if (err.name !== 'AbortError') {
+            console.error('Play error on unmute:', err)
+          }
+        })
+      }
+    }
+    track.onmute = () => {
+      console.log(`[PlayerCameraFeed] Track muted for ${props.playerName}`)
+    }
+  })
+
   videoEl.value.srcObject = stream
 
   // Listen for tracks being added to the stream

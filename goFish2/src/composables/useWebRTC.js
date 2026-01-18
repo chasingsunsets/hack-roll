@@ -6,6 +6,7 @@ const remoteStreams = ref(new Map()) // playerId -> MediaStream
 
 // ICE servers for NAT traversal
 // STUN servers help discover public IP, TURN servers relay when direct connection fails
+// Note: For production, you should use a proper TURN service (coturn, Twilio, etc.)
 const iceServers = {
   iceServers: [
     // Free STUN servers
@@ -14,29 +15,21 @@ const iceServers = {
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
-    // Additional STUN servers for redundancy
-    { urls: 'stun:stun.stunprotocol.org:3478' },
-    { urls: 'stun:stun.voip.blackberry.com:3478' },
-    // Free TURN servers from Metered (reliable public TURN)
+    // OpenRelay Project - free TURN servers for testing
     {
-      urls: 'turn:a.relay.metered.ca:80',
-      username: 'e8dd65f92ae757249e72a7e1',
-      credential: '9jf5SXvMs1yWxPnS'
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
     },
     {
-      urls: 'turn:a.relay.metered.ca:80?transport=tcp',
-      username: 'e8dd65f92ae757249e72a7e1',
-      credential: '9jf5SXvMs1yWxPnS'
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
     },
     {
-      urls: 'turn:a.relay.metered.ca:443',
-      username: 'e8dd65f92ae757249e72a7e1',
-      credential: '9jf5SXvMs1yWxPnS'
-    },
-    {
-      urls: 'turn:a.relay.metered.ca:443?transport=tcp',
-      username: 'e8dd65f92ae757249e72a7e1',
-      credential: '9jf5SXvMs1yWxPnS'
+      urls: 'turns:openrelay.metered.ca:443',
+      username: 'openrelayproject', 
+      credential: 'openrelayproject'
     }
   ],
   iceCandidatePoolSize: 10
@@ -108,7 +101,9 @@ export function useWebRTC(getRawSocket, myId) {
     // Handle ICE candidates
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log(`[WebRTC] Sending ICE candidate to ${peerId}`, event.candidate.type)
+        const candidateType = event.candidate.type || 'unknown'
+        const protocol = event.candidate.protocol || 'unknown'
+        console.log(`[WebRTC] ICE candidate for ${peerId}: type=${candidateType}, protocol=${protocol}`)
         getSocket().emit('webrtc-ice-candidate', {
           to: peerId,
           candidate: event.candidate
