@@ -35,6 +35,7 @@ let onOctopusTroll = null;
 let onDeckSwapTroll = null;
 let onGameStateUpdate = null;
 let onEarthquakeTroll = null;
+let onSlangCommentBroadcast = null;
 
 export function useSocket() {
   // Load session from localStorage
@@ -77,6 +78,8 @@ export function useSocket() {
     loadSession();
 
     const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+    console.log('Connecting to server:', serverUrl);
+    console.log('Environment variables:', import.meta.env);
     socket.value = io(serverUrl);
 
     socket.value.on('connect', () => {
@@ -191,6 +194,10 @@ export function useSocket() {
     socket.value.on('earthquake-troll', (data) => {
       onEarthquakeTroll?.(data);
     });
+
+    socket.value.on('slang-comment-broadcast', (data) => {
+      onSlangCommentBroadcast?.(data);
+    });
   }
 
   function disconnect() {
@@ -299,6 +306,14 @@ export function useSocket() {
     });
   }
 
+  function sendSlangComment(slangText) {
+    return new Promise((resolve) => {
+      socket.value.emit('slang-comment', roomCode.value, slangText, (response) => {
+        resolve(response);
+      });
+    });
+  }
+
   function setEventHandlers(handlers) {
     onPlayerJoined = handlers.onPlayerJoined;
     onPlayerLeft = handlers.onPlayerLeft;
@@ -314,6 +329,7 @@ export function useSocket() {
     onDeckSwapTroll = handlers.onDeckSwapTroll;
     onGameStateUpdate = handlers.onGameStateUpdate;
     onEarthquakeTroll = handlers.onEarthquakeTroll;
+    onSlangCommentBroadcast = handlers.onSlangCommentBroadcast;
   }
 
   // Check if we have an existing session
@@ -355,6 +371,7 @@ export function useSocket() {
     drawCard,
     reportBannedMove,
     reportGesture,
+    sendSlangComment,
     setEventHandlers,
     hasSession,
     clearSession,

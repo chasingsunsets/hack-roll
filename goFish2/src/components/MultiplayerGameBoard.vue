@@ -14,6 +14,8 @@ import DeckSwapTroll from './DeckSwapTroll.vue'
 import EarthquakeTroll from './EarthquakeTroll.vue'
 import SoundControls from './SoundControls.vue'
 import TauntMessage from './TauntMessage.vue'
+import SinglishButtons from './SinglishButtons.vue'
+import SlangMessage from './SlangMessage.vue'
 
 // Camera & Gesture Detection
 import CameraFeed from './camera/CameraFeed.vue'
@@ -52,6 +54,7 @@ const {
   drawCard,
   reportBannedMove,
   reportGesture,
+  sendSlangComment,
   setEventHandlers,
   disconnect,
   socket,
@@ -92,6 +95,8 @@ const showOctopusTroll = ref(false)
 const showDeckSwapTroll = ref(false)
 const showEarthquakeTroll = ref(false)
 const showTauntMessage = ref(false)
+const showSlangMessage = ref(false)
+const currentSlangMessage = ref({ playerName: '', slangText: '' })
 
 // Sound effects
 const {
@@ -344,6 +349,15 @@ onMounted(() => {
         text: data.message || 'Earthquake! The ground is shaking!',
         type: 'warning'
       }
+    },
+
+    onSlangCommentBroadcast: (data) => {
+      // Show slang message with text-to-speech
+      currentSlangMessage.value = {
+        playerName: data.playerName,
+        slangText: data.slangText
+      }
+      showSlangMessage.value = true
     }
   })
 })
@@ -596,6 +610,14 @@ function onBannedMoveAlertClose() {
   currentPenalty.value = null
 }
 
+async function handleSlangClick(slangText) {
+  await sendSlangComment(slangText)
+}
+
+function onSlangMessageComplete() {
+  showSlangMessage.value = false
+}
+
 function handleLeaveGame() {
   disconnect()
   emit('leave-game')
@@ -621,6 +643,15 @@ function handleLeaveGame() {
     <!-- Sound Controls -->
     <SoundControls />
     <TauntMessage v-if="showTauntMessage" @complete="onTauntMessageComplete" />
+
+    <!-- Singlish Slang -->
+    <SlangMessage
+      v-if="showSlangMessage"
+      :player-name="currentSlangMessage.playerName"
+      :slang-text="currentSlangMessage.slangText"
+      @complete="onSlangMessageComplete"
+    />
+    <SinglishButtons @slang-clicked="handleSlangClick" />
 
     <!-- Camera Permission Modal -->
     <CameraPermission

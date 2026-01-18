@@ -715,6 +715,32 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Singlish slang comment
+  socket.on('slang-comment', (roomCode, slangText, callback) => {
+    const room = rooms.get(roomCode);
+
+    if (!room || !room.gameStarted) {
+      callback({ success: false, error: 'Invalid game state' });
+      return;
+    }
+
+    const player = room.players.find(p => p.id === socket.sessionId);
+
+    if (!player) {
+      callback({ success: false, error: 'Player not found' });
+      return;
+    }
+
+    // Broadcast the slang comment to all players in the room
+    io.to(room.code).emit('slang-comment-broadcast', {
+      playerId: player.id,
+      playerName: player.name,
+      slangText: slangText
+    });
+
+    callback({ success: true });
+  });
+
   // Handle disconnection
   socket.on('disconnect', () => {
     console.log('Player disconnected:', socket.id, 'sessionId:', socket.sessionId);
