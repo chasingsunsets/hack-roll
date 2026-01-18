@@ -237,7 +237,3 @@ Configure server URL in [useSocket.js](src/composables/useSocket.js)
 ## Credits
 
 Built for a hackathon project combining classic card games with modern web technologies.
-
-## License
-
-[Add your license information here]
