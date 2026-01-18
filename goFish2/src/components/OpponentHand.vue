@@ -96,13 +96,13 @@ function handleClick() {
         <div v-if="cardCount > 7" class="extra-cards">+{{ cardCount - 7 }}</div>
       </div>
     </div>
-    <!-- Camera feed outside the yellow box -->
+    <!-- Camera feed outside the yellow box - prominent display -->
     <PlayerCameraFeed
       v-if="showCamera && cameraStream"
       :stream="cameraStream"
       :player-name="name"
       :is-local="false"
-      size="large"
+      size="xlarge"
       class="opponent-camera-external"
     />
   </div>
@@ -114,7 +114,15 @@ function handleClick() {
 .opponent-container {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 20px;
+}
+
+/* When camera is visible, add visual connection */
+.opponent-container:has(.opponent-camera-external) {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 15px;
+  border-radius: 4px;
+  border: 2px solid rgba(79, 195, 247, 0.3);
 }
 
 .opponent-hand {
@@ -204,6 +212,16 @@ function handleClick() {
 
 .opponent-camera-external {
   flex-shrink: 0;
+  animation: camera-glow 2s ease-in-out infinite;
+}
+
+@keyframes camera-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 8px rgba(79, 195, 247, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 15px rgba(79, 195, 247, 0.7));
+  }
 }
 
 .cards-container.top .opponent-card {

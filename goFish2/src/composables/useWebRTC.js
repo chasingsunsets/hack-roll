@@ -13,8 +13,13 @@ const iceServers = {
   ]
 }
 
-export function useWebRTC(socket, myId) {
+export function useWebRTC(getRawSocket, myId) {
   let localStream = null
+
+  // Helper to get the raw socket
+  function getSocket() {
+    return typeof getRawSocket === 'function' ? getRawSocket() : getRawSocket?.value;
+  }
 
   /**
    * Initialize WebRTC with local camera stream
@@ -47,16 +52,28 @@ export function useWebRTC(socket, myId) {
     // Handle incoming remote stream
     pc.ontrack = (event) => {
       console.log(`[WebRTC] Received ${event.track.kind} track from ${peerId}`)
-      const [remoteStream] = event.streams
-      remoteStreams.value.set(peerId, remoteStream)
-      console.log(`[WebRTC] Remote stream added for ${peerId}`)
+      console.log(`[WebRTC] Track state: enabled=${event.track.enabled}, muted=${event.track.muted}, readyState=${event.track.readyState}`)
+      console.log(`[WebRTC] Event streams:`, event.streams.length)
+
+      if (event.streams && event.streams[0]) {
+        const remoteStream = event.streams[0]
+        console.log(`[WebRTC] Remote stream has ${remoteStream.getTracks().length} tracks, ${remoteStream.getVideoTracks().length} video tracks`)
+
+        // Create a new Map to trigger Vue reactivity
+        const newMap = new Map(remoteStreams.value)
+        newMap.set(peerId, remoteStream)
+        remoteStreams.value = newMap
+        console.log(`[WebRTC] Remote stream added/updated for ${peerId}, total streams:`, remoteStreams.value.size)
+      } else {
+        console.warn(`[WebRTC] No stream in ontrack event from ${peerId}`)
+      }
     }
 
     // Handle ICE candidates
     pc.onicecandidate = (event) => {
       if (event.candidate) {
         console.log(`[WebRTC] Sending ICE candidate to ${peerId}`)
-        socket.value.emit('webrtc-ice-candidate', {
+        getSocket().emit('webrtc-ice-candidate', {
           to: peerId,
           candidate: event.candidate
         })
@@ -85,7 +102,7 @@ export function useWebRTC(socket, myId) {
       await pc.setLocalDescription(offer)
 
       console.log(`[WebRTC] Sending offer to ${peerId}`)
-      socket.value.emit('webrtc-offer', {
+      getSocket().emit('webrtc-offer', {
         to: peerId,
         offer: offer
       })
@@ -100,14 +117,35 @@ export function useWebRTC(socket, myId) {
   async function handleOffer(peerId, offer) {
     try {
       console.log(`[WebRTC] Received offer from ${peerId}`)
-      const pc = createPeerConnection(peerId)
+
+      // Check if connection already exists (renegotiation case)
+      let pc = peerConnections.value.get(peerId)
+      const isRenegotiation = !!pc
+
+      if (!pc) {
+        pc = createPeerConnection(peerId)
+      } else {
+        console.log(`[WebRTC] Handling renegotiation offer from ${peerId}`)
+        // Add local tracks if we have them and they aren't added yet
+        if (localStream) {
+          const senders = pc.getSenders()
+          const hasVideoTrack = senders.some(s => s.track && s.track.kind === 'video')
+          if (!hasVideoTrack) {
+            localStream.getTracks().forEach(track => {
+              pc.addTrack(track, localStream)
+              console.log(`[WebRTC] Added ${track.kind} track during renegotiation with ${peerId}`)
+            })
+          }
+        }
+      }
+
       await pc.setRemoteDescription(new RTCSessionDescription(offer))
 
       const answer = await pc.createAnswer()
       await pc.setLocalDescription(answer)
 
       console.log(`[WebRTC] Sending answer to ${peerId}`)
-      socket.value.emit('webrtc-answer', {
+      getSocket().emit('webrtc-answer', {
         to: peerId,
         answer: answer
       })
@@ -158,8 +196,49 @@ export function useWebRTC(socket, myId) {
     console.log(`[WebRTC] Connecting to peers:`, playerIds)
     for (const peerId of playerIds) {
       if (peerId !== myId.value) {
-        await createOffer(peerId)
+        // Check if we already have a connection with this peer
+        const existingPc = peerConnections.value.get(peerId)
+        if (existingPc) {
+          // Add our local tracks to the existing connection and renegotiate
+          console.log(`[WebRTC] Adding local stream to existing connection with ${peerId}`)
+          await addTracksAndRenegotiate(peerId, existingPc)
+        } else {
+          await createOffer(peerId)
+        }
       }
+    }
+  }
+
+  /**
+   * Add local tracks to an existing connection and renegotiate
+   */
+  async function addTracksAndRenegotiate(peerId, pc) {
+    try {
+      // Check if tracks are already added
+      const senders = pc.getSenders()
+      const hasVideoTrack = senders.some(s => s.track && s.track.kind === 'video')
+
+      if (!hasVideoTrack && localStream) {
+        // Add local tracks
+        localStream.getTracks().forEach(track => {
+          pc.addTrack(track, localStream)
+          console.log(`[WebRTC] Added ${track.kind} track to existing peer ${peerId}`)
+        })
+
+        // Create a new offer to renegotiate
+        const offer = await pc.createOffer()
+        await pc.setLocalDescription(offer)
+
+        console.log(`[WebRTC] Sending renegotiation offer to ${peerId}`)
+        getSocket().emit('webrtc-offer', {
+          to: peerId,
+          offer: offer
+        })
+      } else {
+        console.log(`[WebRTC] Tracks already added to peer ${peerId}, skipping`)
+      }
+    } catch (error) {
+      console.error(`[WebRTC] Error renegotiating with ${peerId}:`, error)
     }
   }
 
@@ -177,10 +256,15 @@ export function useWebRTC(socket, myId) {
     const pc = peerConnections.value.get(peerId)
     if (pc) {
       pc.close()
-      peerConnections.value.delete(peerId)
+      const newPcMap = new Map(peerConnections.value)
+      newPcMap.delete(peerId)
+      peerConnections.value = newPcMap
       console.log(`[WebRTC] Closed peer connection for ${peerId}`)
     }
-    remoteStreams.value.delete(peerId)
+    // Trigger reactivity by creating new Map
+    const newStreamsMap = new Map(remoteStreams.value)
+    newStreamsMap.delete(peerId)
+    remoteStreams.value = newStreamsMap
   }
 
   /**
@@ -199,21 +283,21 @@ export function useWebRTC(socket, myId) {
    * Setup socket event listeners for WebRTC signaling
    */
   function setupSignaling() {
-    if (!socket.value) return
+    if (!getSocket()) return
 
-    socket.value.on('webrtc-offer', ({ from, offer }) => {
+    getSocket().on('webrtc-offer', ({ from, offer }) => {
       handleOffer(from, offer)
     })
 
-    socket.value.on('webrtc-answer', ({ from, answer }) => {
+    getSocket().on('webrtc-answer', ({ from, answer }) => {
       handleAnswer(from, answer)
     })
 
-    socket.value.on('webrtc-ice-candidate', ({ from, candidate }) => {
+    getSocket().on('webrtc-ice-candidate', ({ from, candidate }) => {
       handleIceCandidate(from, candidate)
     })
 
-    socket.value.on('player-disconnected', ({ playerId }) => {
+    getSocket().on('player-disconnected', ({ playerId }) => {
       cleanupPeerConnection(playerId)
     })
 

@@ -54,10 +54,11 @@ const {
   reportGesture,
   setEventHandlers,
   disconnect,
-  socket
+  socket,
+  getRawSocket
 } = useSocket()
 
-// WebRTC for peer-to-peer video
+// WebRTC for peer-to-peer video (use getRawSocket to avoid readonly issues)
 const {
   remoteStreams,
   initializeWebRTC,
@@ -65,7 +66,7 @@ const {
   getRemoteStream,
   setupSignaling,
   cleanupAllPeerConnections
-} = useWebRTC(socket, myId)
+} = useWebRTC(getRawSocket, myId)
 
 // Local UI state
 const selectedCard = ref(null)
@@ -129,6 +130,15 @@ const myPlayer = computed(() => players.value.find(p => p.isYou))
 const opponents = computed(() => players.value.filter(p => !p.isYou))
 const isMyTurn = computed(() => currentTurnId.value === myId.value)
 
+// Computed opponents with their camera streams (ensures reactivity)
+const opponentsWithStreams = computed(() => {
+  return opponents.value.map(opp => ({
+    ...opp,
+    cameraStream: remoteStreams.value.get(opp.id) || null,
+    hasCamera: remoteStreams.value.has(opp.id)
+  }))
+})
+
 const canDrawCard = computed(() =>
   isMyTurn.value &&
   deckCount.value > 0 &&
@@ -161,10 +171,28 @@ watch(gameOver, (isOver) => {
   }
 })
 
+// Debug: Watch for remote streams changes
+watch(remoteStreams, (streams) => {
+  console.log('[Camera Debug] Remote streams updated:', streams.size, 'streams')
+  streams.forEach((stream, peerId) => {
+    console.log(`[Camera Debug] Stream from ${peerId}:`, stream.getTracks().length, 'tracks')
+  })
+}, { deep: true })
+
+// Set up signaling when socket becomes available
+watch(socket, (newSocket) => {
+  if (newSocket) {
+    setupSignaling()
+    console.log('[WebRTC] Signaling set up after socket connected')
+  }
+}, { immediate: true })
+
 // Socket event handlers
 onMounted(() => {
   // Initialize audio context on first user interaction
   initAudio()
+
+  // Note: WebRTC signaling is set up via watcher when socket becomes available
 
   // Set initial message based on whether it's our turn
   if (isMyTurn.value) {
@@ -637,7 +665,7 @@ function handleLeaveGame() {
       <!-- Opponents row -->
       <div class="opponents-row">
         <OpponentHand
-          v-for="opp in opponents"
+          v-for="opp in opponentsWithStreams"
           :key="opp.id"
           :name="opp.name"
           :card-count="opp.cardCount"
@@ -645,8 +673,8 @@ function handleLeaveGame() {
           :is-selected="selectedOpponent === opp.id"
           :is-selectable="isMyTurn && !gameOver && !mustDrawCard"
           position="top"
-          :show-camera="showCameraFeed && getRemoteStream(opp.id) !== null"
-          :camera-stream="getRemoteStream(opp.id)"
+          :show-camera="opp.hasCamera"
+          :camera-stream="opp.cameraStream"
           @select="selectOpponentForAsk(opp.id)"
         />
       </div>
@@ -798,8 +826,9 @@ function handleLeaveGame() {
 .opponents-row {
   display: flex;
   justify-content: center;
-  gap: 40px;
+  gap: 30px;
   padding: 20px;
+  flex-wrap: wrap;
 }
 
 .table-center {
