@@ -14,7 +14,6 @@ const slangs = [
   { text: 'Sian diao!', icon: '😑' }
 ]
 
-const isExpanded = ref(false)
 const cooldown = ref(false)
 
 function handleSlangClick(slang) {
@@ -28,37 +27,26 @@ function handleSlangClick(slang) {
     cooldown.value = false
   }, 2000)
 }
-
-function toggleExpanded() {
-  isExpanded.value = !isExpanded.value
-}
 </script>
 
 <template>
   <div class="singlish-buttons">
-    <button
-      class="toggle-btn pixel-btn"
-      @click="toggleExpanded"
-      :class="{ active: isExpanded }"
-    >
+    <div class="header">
       <span class="emoji">💬</span>
-      <span class="label">Singlish</span>
-    </button>
-
-    <transition name="slide-up">
-      <div v-if="isExpanded" class="slang-grid">
-        <button
-          v-for="slang in slangs"
-          :key="slang.text"
-          class="slang-btn pixel-btn"
-          @click="handleSlangClick(slang)"
-          :disabled="cooldown"
-        >
-          <span class="emoji">{{ slang.icon }}</span>
-          <span class="text">{{ slang.text }}</span>
-        </button>
-      </div>
-    </transition>
+      <span class="title">Singlish</span>
+    </div>
+    <div class="slang-column">
+      <button
+        v-for="slang in slangs"
+        :key="slang.text"
+        class="slang-btn pixel-btn"
+        @click="handleSlangClick(slang)"
+        :disabled="cooldown"
+      >
+        <span class="emoji">{{ slang.icon }}</span>
+        <span class="text">{{ slang.text }}</span>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -67,43 +55,76 @@ function toggleExpanded() {
 
 .singlish-buttons {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 12px;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.85);
+  padding: 12px;
+  border: 4px solid #000;
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 #000;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  padding-bottom: 8px;
+  border-bottom: 3px solid #667eea;
+  margin-bottom: 4px;
+}
+
+.header .emoji {
+  font-size: 1.2rem;
+}
+
+.header .title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.7rem;
+  color: #fff;
+  text-shadow: 2px 2px 0 #000;
+}
+
+.slang-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .pixel-btn {
   font-family: 'Press Start 2P', monospace;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  border: 4px solid #000;
-  padding: 12px 16px;
+  border: 3px solid #000;
+  padding: 10px 14px;
   cursor: pointer;
   transition: all 0.2s;
   box-shadow:
-    4px 4px 0 #000,
+    3px 3px 0 #000,
     inset -2px -2px 0 rgba(0,0,0,0.3),
     inset 2px 2px 0 rgba(255,255,255,0.3);
-  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 150px;
 }
 
 .pixel-btn:hover:not(:disabled) {
-  transform: translate(2px, 2px);
+  transform: translate(1px, 1px);
   box-shadow:
     2px 2px 0 #000,
     inset -2px -2px 0 rgba(0,0,0,0.3),
     inset 2px 2px 0 rgba(255,255,255,0.3);
+  background: linear-gradient(135deg, #7a8eff 0%, #8a5fb8 100%);
 }
 
 .pixel-btn:active:not(:disabled) {
-  transform: translate(4px, 4px);
+  transform: translate(3px, 3px);
   box-shadow:
     0px 0px 0 #000,
     inset -2px -2px 0 rgba(0,0,0,0.5),
@@ -111,119 +132,111 @@ function toggleExpanded() {
 }
 
 .pixel-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.toggle-btn {
-  font-size: 0.8rem;
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-}
-
-.toggle-btn.active {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-}
-
-.emoji {
-  font-size: 1.2rem;
+.slang-btn .emoji {
+  font-size: 1.3rem;
   line-height: 1;
 }
 
-.label {
-  font-size: 0.6rem;
-  white-space: nowrap;
-}
-
-.slang-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  background: rgba(0, 0, 0, 0.8);
-  padding: 12px;
-  border: 4px solid #000;
-  border-radius: 8px;
-  box-shadow: 4px 4px 0 #000;
-}
-
-.slang-btn {
-  font-size: 0.6rem;
-  padding: 10px 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  flex-direction: column;
-  gap: 4px;
-  min-width: 120px;
-}
-
-.slang-btn .emoji {
-  font-size: 1.5rem;
-}
-
 .slang-btn .text {
-  font-size: 0.5rem;
+  font-size: 0.55rem;
   white-space: nowrap;
-}
-
-/* Slide up animation */
-.slide-up-enter-active,
-.slide-up-leave-active {
-  transition: all 0.3s ease;
-}
-
-.slide-up-enter-from {
-  opacity: 0;
-  transform: translateY(20px);
-}
-
-.slide-up-leave-to {
-  opacity: 0;
-  transform: translateY(20px);
+  flex: 1;
 }
 
 /* Mobile responsive */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .singlish-buttons {
-    bottom: 15px;
-    right: 15px;
+    left: 10px;
+    padding: 10px;
   }
 
-  .slang-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 6px;
+  .pixel-btn {
+    min-width: 130px;
+    padding: 8px 12px;
+  }
+
+  .slang-btn .text {
+    font-size: 0.5rem;
+  }
+
+  .header .title {
+    font-size: 0.6rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .singlish-buttons {
+    left: 8px;
+    top: auto;
+    bottom: 80px;
+    transform: none;
     padding: 8px;
   }
 
-  .slang-btn {
-    min-width: 100px;
+  .slang-column {
+    gap: 6px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .pixel-btn {
+    min-width: 120px;
     padding: 8px 10px;
+  }
+
+  .slang-btn .emoji {
+    font-size: 1.1rem;
   }
 
   .slang-btn .text {
     font-size: 0.45rem;
   }
 
-  .toggle-btn {
-    font-size: 0.7rem;
-  }
-
-  .label {
-    font-size: 0.5rem;
+  .header .title {
+    font-size: 0.55rem;
   }
 }
 
 @media (max-width: 480px) {
   .singlish-buttons {
-    bottom: 10px;
-    right: 10px;
+    left: 5px;
+    bottom: 70px;
   }
 
-  .slang-grid {
-    grid-template-columns: 1fr;
-    max-height: 300px;
-    overflow-y: auto;
+  .pixel-btn {
+    min-width: 100px;
+    padding: 6px 8px;
+    gap: 6px;
   }
 
-  .slang-btn {
-    min-width: 140px;
+  .slang-btn .emoji {
+    font-size: 1rem;
+  }
+
+  .slang-btn .text {
+    font-size: 0.4rem;
+  }
+
+  .header {
+    padding-bottom: 6px;
+    gap: 6px;
+  }
+
+  .header .emoji {
+    font-size: 1rem;
+  }
+
+  .header .title {
+    font-size: 0.5rem;
+  }
+
+  .slang-column {
+    gap: 5px;
+    max-height: 250px;
   }
 }
 </style>
