@@ -53,7 +53,11 @@ async function attachStream(stream, retryCount = 0) {
     if (videoEl.value) {
       videoEl.value.srcObject = null
       videoEl.value.srcObject = stream
-      videoEl.value.play().catch(err => console.error('Play error:', err))
+      videoEl.value.play().catch(err => {
+        if (err.name !== 'AbortError') {
+          console.error('Play error:', err)
+        }
+      })
     }
   }
 
@@ -61,7 +65,12 @@ async function attachStream(stream, retryCount = 0) {
     await videoEl.value.play()
     console.log(`[PlayerCameraFeed] Video playing for ${props.playerName}`)
   } catch (err) {
-    console.error(`[PlayerCameraFeed] Error playing video for ${props.playerName}:`, err)
+    // AbortError is expected when stream changes or element is removed - don't log as error
+    if (err.name === 'AbortError') {
+      console.log(`[PlayerCameraFeed] Play aborted for ${props.playerName} (stream changed or element removed)`)
+    } else {
+      console.error(`[PlayerCameraFeed] Error playing video for ${props.playerName}:`, err)
+    }
   }
 }
 

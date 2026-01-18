@@ -14,26 +14,40 @@ const iceServers = {
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
-    // Free TURN servers from Open Relay Project (metered.ca)
-    // These provide relay for connections that can't use STUN
+    // Additional STUN servers for redundancy
+    { urls: 'stun:stun.stunprotocol.org:3478' },
+    { urls: 'stun:stun.voip.blackberry.com:3478' },
+    // Free TURN servers from Metered (reliable public TURN)
     {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
+      urls: 'turn:a.relay.metered.ca:80',
+      username: 'e8dd65f92ae757249e72a7e1',
+      credential: '9jf5SXvMs1yWxPnS'
     },
     {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
+      urls: 'turn:a.relay.metered.ca:80?transport=tcp',
+      username: 'e8dd65f92ae757249e72a7e1',
+      credential: '9jf5SXvMs1yWxPnS'
     },
     {
-      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
+      urls: 'turn:a.relay.metered.ca:443',
+      username: 'e8dd65f92ae757249e72a7e1',
+      credential: '9jf5SXvMs1yWxPnS'
+    },
+    {
+      urls: 'turn:a.relay.metered.ca:443?transport=tcp',
+      username: 'e8dd65f92ae757249e72a7e1',
+      credential: '9jf5SXvMs1yWxPnS'
     }
   ],
   iceCandidatePoolSize: 10
 }
+
+// Track pending reconnections to avoid duplicates
+const pendingReconnections = new Set()
+// Track if we've set up signaling (to avoid duplicate listeners)
+let signalingSetup = false
+// Track ongoing negotiations to handle glare
+const makingOffer = new Map() // peerId -> boolean
 
 export function useWebRTC(getRawSocket, myId) {
   let localStream = null
@@ -122,8 +136,21 @@ export function useWebRTC(getRawSocket, myId) {
     // Handle connection state changes
     pc.onconnectionstatechange = () => {
       console.log(`[WebRTC] Connection state with ${peerId}: ${pc.connectionState}`)
-      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+      if (pc.connectionState === 'failed') {
+        // On failure, cleanup and try to reconnect after a delay
         cleanupPeerConnection(peerId)
+        scheduleReconnection(peerId)
+      } else if (pc.connectionState === 'disconnected') {
+        // Disconnected might recover, wait a bit before cleaning up
+        console.log(`[WebRTC] Connection disconnected with ${peerId}, waiting for recovery...`)
+        setTimeout(() => {
+          const currentPc = peerConnections.value.get(peerId)
+          if (currentPc && currentPc.connectionState === 'disconnected') {
+            console.log(`[WebRTC] Connection still disconnected with ${peerId}, cleaning up`)
+            cleanupPeerConnection(peerId)
+            scheduleReconnection(peerId)
+          }
+        }, 5000)
       }
     }
 
@@ -132,13 +159,56 @@ export function useWebRTC(getRawSocket, myId) {
   }
 
   /**
+   * Schedule a reconnection attempt with a peer
+   */
+  function scheduleReconnection(peerId) {
+    if (pendingReconnections.has(peerId)) {
+      console.log(`[WebRTC] Reconnection already pending for ${peerId}`)
+      return
+    }
+    if (!localStream) {
+      console.log(`[WebRTC] No local stream, skipping reconnection with ${peerId}`)
+      return
+    }
+    
+    pendingReconnections.add(peerId)
+    console.log(`[WebRTC] Scheduling reconnection with ${peerId} in 2 seconds...`)
+    
+    setTimeout(async () => {
+      pendingReconnections.delete(peerId)
+      if (localStream && !peerConnections.value.has(peerId)) {
+        console.log(`[WebRTC] Attempting reconnection with ${peerId}`)
+        await createOffer(peerId)
+      }
+    }, 2000)
+  }
+
+  /**
    * Create and send an offer to a peer
+   * Uses makingOffer flag to handle glare condition
    */
   async function createOffer(peerId) {
     try {
       const pc = createPeerConnection(peerId)
+      
+      // Check if we're in a valid state to create an offer
+      if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-local-offer') {
+        console.log(`[WebRTC] Cannot create offer for ${peerId}, signaling state: ${pc.signalingState}`)
+        return
+      }
+      
+      makingOffer.set(peerId, true)
       const offer = await pc.createOffer()
+      
+      // Check state again after async operation
+      if (pc.signalingState !== 'stable') {
+        console.log(`[WebRTC] State changed during offer creation for ${peerId}, aborting`)
+        makingOffer.set(peerId, false)
+        return
+      }
+      
       await pc.setLocalDescription(offer)
+      makingOffer.set(peerId, false)
 
       console.log(`[WebRTC] Sending offer to ${peerId}`)
       getSocket().emit('webrtc-offer', {
@@ -146,35 +216,59 @@ export function useWebRTC(getRawSocket, myId) {
         offer: offer
       })
     } catch (error) {
+      makingOffer.set(peerId, false)
       console.error(`[WebRTC] Error creating offer for ${peerId}:`, error)
     }
   }
 
   /**
+   * Determine if we should be the "polite" peer (will rollback on glare)
+   * The peer with the lexicographically smaller ID is polite
+   */
+  function isPolite(peerId) {
+    const myIdValue = typeof myId === 'object' ? myId.value : myId
+    return myIdValue < peerId
+  }
+
+  /**
    * Handle incoming offer from a peer
+   * Implements "polite peer" pattern to handle simultaneous offers (glare)
    */
   async function handleOffer(peerId, offer) {
     try {
       console.log(`[WebRTC] Received offer from ${peerId}`)
 
-      // Check if connection already exists (renegotiation case)
       let pc = peerConnections.value.get(peerId)
-      const isRenegotiation = !!pc
-
+      
       if (!pc) {
         pc = createPeerConnection(peerId)
-      } else {
-        console.log(`[WebRTC] Handling renegotiation offer from ${peerId}`)
-        // Add local tracks if we have them and they aren't added yet
-        if (localStream) {
-          const senders = pc.getSenders()
-          const hasVideoTrack = senders.some(s => s.track && s.track.kind === 'video')
-          if (!hasVideoTrack) {
-            localStream.getTracks().forEach(track => {
-              pc.addTrack(track, localStream)
-              console.log(`[WebRTC] Added ${track.kind} track during renegotiation with ${peerId}`)
-            })
-          }
+      }
+      
+      // Handle glare condition (both peers sent offers simultaneously)
+      const offerCollision = makingOffer.get(peerId) || pc.signalingState !== 'stable'
+      const polite = isPolite(peerId)
+      
+      if (offerCollision) {
+        if (!polite) {
+          // We're impolite - ignore incoming offer, our offer takes precedence
+          console.log(`[WebRTC] Ignoring offer from ${peerId} (we're impolite, glare condition)`)
+          return
+        }
+        // We're polite - rollback our offer and accept theirs
+        console.log(`[WebRTC] Rolling back local offer for ${peerId} (we're polite)`)
+        await pc.setLocalDescription({ type: 'rollback' })
+        makingOffer.set(peerId, false)
+      }
+
+      // Add local tracks if we have them and they aren't added yet
+      if (localStream) {
+        const senders = pc.getSenders()
+        const hasVideoTrack = senders.some(s => s.track && s.track.kind === 'video')
+        if (!hasVideoTrack) {
+          localStream.getTracks().forEach(track => {
+            pc.addTrack(track, localStream)
+            console.log(`[WebRTC] Added ${track.kind} track for ${peerId}`)
+          })
         }
       }
 
@@ -201,7 +295,12 @@ export function useWebRTC(getRawSocket, myId) {
       console.log(`[WebRTC] Received answer from ${peerId}`)
       const pc = peerConnections.value.get(peerId)
       if (pc) {
-        await pc.setRemoteDescription(new RTCSessionDescription(answer))
+        // Only set remote description if we're expecting an answer
+        if (pc.signalingState === 'have-local-offer') {
+          await pc.setRemoteDescription(new RTCSessionDescription(answer))
+        } else {
+          console.log(`[WebRTC] Ignoring answer from ${peerId}, signaling state: ${pc.signalingState}`)
+        }
       }
     } catch (error) {
       console.error(`[WebRTC] Error handling answer from ${peerId}:`, error)
@@ -225,6 +324,7 @@ export function useWebRTC(getRawSocket, myId) {
 
   /**
    * Start WebRTC with all peers in the room
+   * Only initiates connections if we have the lower peer ID (to avoid duplicate offers)
    */
   async function connectToPeers(playerIds) {
     if (!localStream) {
@@ -232,17 +332,18 @@ export function useWebRTC(getRawSocket, myId) {
       return
     }
 
-    console.log(`[WebRTC] Connecting to peers:`, playerIds)
+    const myIdValue = typeof myId === 'object' ? myId.value : myId
+    console.log(`[WebRTC] Connecting to peers:`, playerIds, 'myId:', myIdValue)
+    
     for (const peerId of playerIds) {
-      if (peerId !== myId.value) {
-        // Check if we already have a connection with this peer
-        const existingPc = peerConnections.value.get(peerId)
-        if (existingPc) {
-          // Add our local tracks to the existing connection and renegotiate
-          console.log(`[WebRTC] Adding local stream to existing connection with ${peerId}`)
-          await addTracksAndRenegotiate(peerId, existingPc)
-        } else {
+      if (peerId !== myIdValue) {
+        // Only initiate if we have lower ID (prevents both peers sending offers)
+        // The other peer will receive our camera-ready notification and may also connect
+        if (myIdValue < peerId) {
+          console.log(`[WebRTC] Initiating connection to ${peerId} (we have lower ID)`)
           await createOffer(peerId)
+        } else {
+          console.log(`[WebRTC] Waiting for ${peerId} to initiate (they have lower ID)`)
         }
       }
     }
@@ -352,10 +453,31 @@ export function useWebRTC(getRawSocket, myId) {
 
     // When another peer's camera is ready, initiate connection to them
     getSocket().on('peer-camera-ready', ({ peerId }) => {
-      console.log(`[WebRTC] Peer ${peerId} camera ready, initiating connection`)
-      if (localStream) {
-        // We have our own camera, so create an offer
+      console.log(`[WebRTC] Peer ${peerId} camera ready`)
+      if (!localStream) {
+        console.log(`[WebRTC] No local stream, skipping connection to ${peerId}`)
+        return
+      }
+      
+      // Check if we already have a healthy connection
+      const existingPc = peerConnections.value.get(peerId)
+      if (existingPc) {
+        const state = existingPc.connectionState
+        if (state === 'connected' || state === 'connecting') {
+          console.log(`[WebRTC] Already ${state} with ${peerId}, skipping`)
+          return
+        }
+        // Clean up failed/closed connection before creating new one
+        cleanupPeerConnection(peerId)
+      }
+      
+      // Both peers might try to connect - use ID comparison to decide who initiates
+      const myIdValue = typeof myId === 'object' ? myId.value : myId
+      if (myIdValue < peerId) {
+        console.log(`[WebRTC] Initiating connection to ${peerId} (we have lower ID)`)
         createOffer(peerId)
+      } else {
+        console.log(`[WebRTC] Waiting for ${peerId} to initiate (they have lower ID)`)
       }
     })
 
