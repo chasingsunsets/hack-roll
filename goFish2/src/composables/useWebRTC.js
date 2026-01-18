@@ -4,13 +4,35 @@ import { ref, watch } from 'vue'
 const peerConnections = ref(new Map()) // playerId -> RTCPeerConnection
 const remoteStreams = ref(new Map()) // playerId -> MediaStream
 
-// ICE servers for NAT traversal (using free public STUN servers)
+// ICE servers for NAT traversal
+// STUN servers help discover public IP, TURN servers relay when direct connection fails
 const iceServers = {
   iceServers: [
+    // Free STUN servers
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' }
-  ]
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    // Free TURN servers from Open Relay Project (metered.ca)
+    // These provide relay for connections that can't use STUN
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    }
+  ],
+  iceCandidatePoolSize: 10
 }
 
 export function useWebRTC(getRawSocket, myId) {
@@ -72,12 +94,29 @@ export function useWebRTC(getRawSocket, myId) {
     // Handle ICE candidates
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log(`[WebRTC] Sending ICE candidate to ${peerId}`)
+        console.log(`[WebRTC] Sending ICE candidate to ${peerId}`, event.candidate.type)
         getSocket().emit('webrtc-ice-candidate', {
           to: peerId,
           candidate: event.candidate
         })
+      } else {
+        console.log(`[WebRTC] ICE candidate gathering complete for ${peerId}`)
       }
+    }
+
+    // Handle ICE connection state changes (more granular than connection state)
+    pc.oniceconnectionstatechange = () => {
+      console.log(`[WebRTC] ICE connection state with ${peerId}: ${pc.iceConnectionState}`)
+      if (pc.iceConnectionState === 'failed') {
+        console.log(`[WebRTC] ICE connection failed with ${peerId}, attempting restart...`)
+        // Try ICE restart
+        pc.restartIce()
+      }
+    }
+
+    // Handle ICE gathering state changes
+    pc.onicegatheringstatechange = () => {
+      console.log(`[WebRTC] ICE gathering state with ${peerId}: ${pc.iceGatheringState}`)
     }
 
     // Handle connection state changes
@@ -285,11 +324,21 @@ export function useWebRTC(getRawSocket, myId) {
   function setupSignaling() {
     if (!getSocket()) return
 
+    // Remove existing listeners to prevent duplicates
+    getSocket().off('webrtc-offer')
+    getSocket().off('webrtc-answer')
+    getSocket().off('webrtc-ice-candidate')
+    getSocket().off('player-disconnected')
+    getSocket().off('peer-camera-ready')
+    getSocket().off('webrtc-connection-requested')
+
     getSocket().on('webrtc-offer', ({ from, offer }) => {
+      console.log(`[WebRTC] Received offer from ${from}`)
       handleOffer(from, offer)
     })
 
     getSocket().on('webrtc-answer', ({ from, answer }) => {
+      console.log(`[WebRTC] Received answer from ${from}`)
       handleAnswer(from, answer)
     })
 
@@ -301,7 +350,46 @@ export function useWebRTC(getRawSocket, myId) {
       cleanupPeerConnection(playerId)
     })
 
+    // When another peer's camera is ready, initiate connection to them
+    getSocket().on('peer-camera-ready', ({ peerId }) => {
+      console.log(`[WebRTC] Peer ${peerId} camera ready, initiating connection`)
+      if (localStream) {
+        // We have our own camera, so create an offer
+        createOffer(peerId)
+      }
+    })
+
+    // When a peer requests a connection with us (they have camera but we initiated)
+    getSocket().on('webrtc-connection-requested', ({ from }) => {
+      console.log(`[WebRTC] Connection requested by ${from}`)
+      if (localStream) {
+        createOffer(from)
+      }
+    })
+
     console.log('[WebRTC] Signaling setup complete')
+  }
+
+  /**
+   * Notify other peers that our camera is ready
+   */
+  function notifyCameraReady() {
+    const socket = getSocket()
+    if (socket) {
+      console.log('[WebRTC] Notifying peers that camera is ready')
+      socket.emit('camera-ready')
+    }
+  }
+
+  /**
+   * Request a WebRTC connection with a specific peer
+   */
+  function requestConnection(peerId) {
+    const socket = getSocket()
+    if (socket) {
+      console.log(`[WebRTC] Requesting connection with ${peerId}`)
+      socket.emit('request-webrtc-connection', { to: peerId })
+    }
   }
 
   return {
@@ -314,6 +402,8 @@ export function useWebRTC(getRawSocket, myId) {
     getRemoteStream,
     setupSignaling,
     cleanupAllPeerConnections,
+    notifyCameraReady,
+    requestConnection,
 
     // Internal (exposed for debugging)
     peerConnections

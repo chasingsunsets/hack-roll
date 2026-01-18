@@ -841,6 +841,40 @@ io.on('connection', (socket) => {
       }
     }
   })
+
+  // Camera ready event - notify other players to establish WebRTC connection
+  socket.on('camera-ready', () => {
+    const room = Array.from(rooms.values()).find(r =>
+      r.players.some(p => p.socketId === socket.id)
+    )
+    if (room) {
+      console.log(`Player ${socket.sessionId} camera ready in room ${room.code}`)
+      // Notify all other players in the room
+      for (const player of room.players) {
+        if (player.socketId && player.socketId !== socket.id) {
+          io.to(player.socketId).emit('peer-camera-ready', {
+            peerId: socket.sessionId
+          })
+        }
+      }
+    }
+  })
+
+  // Request to connect with a specific peer
+  socket.on('request-webrtc-connection', ({ to }) => {
+    const room = Array.from(rooms.values()).find(r =>
+      r.players.some(p => p.socketId === socket.id)
+    )
+    if (room) {
+      const targetPlayer = room.players.find(p => p.id === to)
+      if (targetPlayer && targetPlayer.socketId) {
+        console.log(`Player ${socket.sessionId} requesting WebRTC connection with ${to}`)
+        io.to(targetPlayer.socketId).emit('webrtc-connection-requested', {
+          from: socket.sessionId
+        })
+      }
+    }
+  })
 });
 
 const PORT = process.env.PORT || 3001;

@@ -68,7 +68,9 @@ const {
   connectToPeers,
   getRemoteStream,
   setupSignaling,
-  cleanupAllPeerConnections
+  cleanupAllPeerConnections,
+  notifyCameraReady,
+  requestConnection
 } = useWebRTC(getRawSocket, myId)
 
 // Local UI state
@@ -529,6 +531,9 @@ async function enableCamera() {
       const peerIds = players.value.map(p => p.id)
       await connectToPeers(peerIds)
       console.log('[WebRTC] Connected to peers')
+
+      // Notify other players that our camera is ready so they can connect to us
+      notifyCameraReady()
     }
   } else {
     console.log('No camera feed ref!')
