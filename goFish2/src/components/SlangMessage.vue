@@ -17,8 +17,8 @@ const emit = defineEmits(['complete'])
 const phase = ref('entering') // entering, showing, exiting
 
 onMounted(async () => {
-  // Speak the slang text using Web Speech API
-  speakText(props.slangText)
+  // Note: Audio playback now handled by SinglishButtons component using ElevenLabs TTS
+  // This component is now purely visual
 
   // Phase 1: Enter
   await delay(100)
@@ -32,32 +32,6 @@ onMounted(async () => {
   await delay(400)
   emit('complete')
 })
-
-function speakText(text) {
-  // Check if browser supports Speech Synthesis
-  if ('speechSynthesis' in window) {
-    const utterance = new SpeechSynthesisUtterance(text)
-
-    // Configure speech properties
-    utterance.rate = 1.1 // Slightly faster
-    utterance.pitch = 1.2 // Slightly higher pitch for comedic effect
-    utterance.volume = 1
-
-    // Try to use a suitable voice (prefer English-SG if available)
-    const voices = window.speechSynthesis.getVoices()
-    const preferredVoice = voices.find(voice =>
-      voice.lang.includes('en-SG') ||
-      voice.lang.includes('en-GB') ||
-      voice.lang.includes('en')
-    )
-
-    if (preferredVoice) {
-      utterance.voice = preferredVoice
-    }
-
-    window.speechSynthesis.speak(utterance)
-  }
-}
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 </script>

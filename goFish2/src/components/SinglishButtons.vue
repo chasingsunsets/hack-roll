@@ -1,7 +1,11 @@
 <script setup>
 import { ref } from 'vue'
+import { useElevenLabsTTS } from '../composables/useElevenLabsTTS'
 
 const emit = defineEmits(['slang-clicked'])
+
+// Initialize ElevenLabs TTS
+const { playPhrase } = useElevenLabsTTS()
 
 const slangs = [
   { text: 'Walao eh!', icon: '😤' },
@@ -16,9 +20,13 @@ const slangs = [
 
 const cooldown = ref(false)
 
-function handleSlangClick(slang) {
+async function handleSlangClick(slang) {
   if (cooldown.value) return
 
+  // Play ElevenLabs TTS locally for the clicker
+  playPhrase(slang.text)
+
+  // Emit socket event for visual message broadcast
   emit('slang-clicked', slang.text)
 
   // Cooldown to prevent spam
