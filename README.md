@@ -1,4 +1,4 @@
-# Go Fish! - Pixel Edition
+# Go Fish! - Endless Game
 
 A multiplayer online card game with a pixel art aesthetic, gesture detection, and chaos elements. Built with Vue 3, Socket.IO, and WebRTC.
 
