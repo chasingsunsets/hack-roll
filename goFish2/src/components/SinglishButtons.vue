@@ -33,7 +33,7 @@ function handleSlangClick(slang) {
   <div class="singlish-buttons">
     <div class="header">
       <span class="emoji">💬</span>
-      <span class="title">Singlish</span>
+      <span class="title">Comments</span>
     </div>
     <div class="slang-column">
       <button
