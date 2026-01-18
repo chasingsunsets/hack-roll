@@ -62,7 +62,7 @@
 11. Select all environments: ✓ Production  ✓ Preview  ✓ Development
 12. Click **"Add"**
 
-13. Now click **"Deploy"** buttonss
+13. Now click **"Deploy"** buttonsss
 14. Wait 1-2 minutes for deployment to complete
 15. **Copy your frontend URL** (e.g., `https://your-app.vercel.app`)
 
