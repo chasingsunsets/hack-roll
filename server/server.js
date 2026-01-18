@@ -875,6 +875,25 @@ io.on('connection', (socket) => {
       }
     }
   })
+
+  // Video frame relay - broadcast frames to other players in the room
+  // This is a fallback for when WebRTC doesn't work
+  socket.on('video-frame', ({ frame }) => {
+    const room = Array.from(rooms.values()).find(r =>
+      r.players.some(p => p.socketId === socket.id)
+    )
+    if (room) {
+      // Broadcast to all other players in the room
+      for (const player of room.players) {
+        if (player.socketId && player.socketId !== socket.id) {
+          io.to(player.socketId).emit('video-frame', {
+            playerId: socket.sessionId,
+            frame
+          })
+        }
+      }
+    }
+  })
 });
 
 const PORT = process.env.PORT || 3001;

@@ -27,6 +27,7 @@ import { useGestureDetection } from '../composables/useGestureDetection'
 import { useSocket } from '../composables/useSocket'
 import { useSoundEffects } from '../composables/useSoundEffects'
 import { useWebRTC } from '../composables/useWebRTC'
+import { useFrameStreaming } from '../composables/useFrameStreaming'
 import { BANNED_MOVES } from '../services/gestureDefinitions'
 
 const props = defineProps({
@@ -72,6 +73,15 @@ const {
   notifyCameraReady,
   requestConnection
 } = useWebRTC(getRawSocket, myId)
+
+// Frame streaming fallback (when WebRTC fails)
+const {
+  remoteFrames,
+  startStreaming,
+  stopStreaming,
+  setupFrameListeners,
+  cleanup: cleanupFrameStreaming
+} = useFrameStreaming(getRawSocket, myId)
 
 // Local UI state
 const selectedCard = ref(null)
@@ -137,13 +147,18 @@ const myPlayer = computed(() => players.value.find(p => p.isYou))
 const opponents = computed(() => players.value.filter(p => !p.isYou))
 const isMyTurn = computed(() => currentTurnId.value === myId.value)
 
-// Computed opponents with their camera streams (ensures reactivity)
+// Computed opponents with their camera streams OR frames (ensures reactivity)
 const opponentsWithStreams = computed(() => {
-  return opponents.value.map(opp => ({
-    ...opp,
-    cameraStream: remoteStreams.value.get(opp.id) || null,
-    hasCamera: remoteStreams.value.has(opp.id)
-  }))
+  return opponents.value.map(opp => {
+    const hasWebRTCStream = remoteStreams.value.has(opp.id)
+    const hasFrame = remoteFrames.value.has(opp.id)
+    return {
+      ...opp,
+      cameraStream: remoteStreams.value.get(opp.id) || null,
+      cameraFrame: remoteFrames.value.get(opp.id) || null,
+      hasCamera: hasWebRTCStream || hasFrame
+    }
+  })
 })
 
 const canDrawCard = computed(() =>
@@ -190,6 +205,7 @@ watch(remoteStreams, (streams) => {
 watch(socket, (newSocket) => {
   if (newSocket) {
     setupSignaling()
+    setupFrameListeners() // Also set up frame streaming listeners
     console.log('[WebRTC] Signaling set up after socket connected')
   }
 }, { immediate: true })
@@ -368,6 +384,7 @@ onMounted(() => {
 onUnmounted(() => {
   disableCamera()
   cleanupAllPeerConnections()
+  cleanupFrameStreaming()
 })
 
 // Card selection
@@ -521,7 +538,11 @@ async function enableCamera() {
       console.log('Cannot start detection - gestureReady:', gestureReady.value, 'cameraEnabled:', cameraEnabled.value)
     }
 
-    // Initialize WebRTC with camera stream
+    // Start frame streaming (fallback that always works through socket)
+    console.log('[FrameStreaming] Starting frame streaming as fallback')
+    startStreaming(videoEl)
+
+    // Also try WebRTC for better quality (if it works)
     if (stream.value) {
       console.log('[WebRTC] Initializing with camera stream')
       await initializeWebRTC(stream.value)
@@ -578,6 +599,7 @@ function waitForVideoReady(videoEl) {
 function disableCamera() {
   stopDetection()
   stopCamera()
+  stopStreaming() // Stop frame streaming
   showCameraFeed.value = false
 }
 
@@ -714,6 +736,7 @@ function handleLeaveGame() {
           position="top"
           :show-camera="opp.hasCamera"
           :camera-stream="opp.cameraStream"
+          :camera-frame="opp.cameraFrame"
           @select="selectOpponentForAsk(opp.id)"
         />
       </div>

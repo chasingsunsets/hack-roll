@@ -37,6 +37,10 @@ defineProps({
     type: MediaStream,
     default: null
   },
+  cameraFrame: {
+    type: String,
+    default: null
+  },
   showCamera: {
     type: Boolean,
     default: false
@@ -98,8 +102,9 @@ function handleClick() {
     </div>
     <!-- Camera feed outside the yellow box - prominent display -->
     <PlayerCameraFeed
-      v-if="showCamera && cameraStream"
+      v-if="showCamera && (cameraStream || cameraFrame)"
       :stream="cameraStream"
+      :frame-url="cameraFrame"
       :player-name="name"
       :is-local="false"
       size="xlarge"

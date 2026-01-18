@@ -6,6 +6,11 @@ const props = defineProps({
     type: MediaStream,
     default: null
   },
+  // Alternative: display a static image frame (from socket streaming)
+  frameUrl: {
+    type: String,
+    default: null
+  },
   playerName: {
     type: String,
     required: true
@@ -24,7 +29,10 @@ const videoEl = ref(null)
 let currentStream = null
 const videoTrackCount = ref(0)
 
+// Check if we have video content (either stream or frame)
+const hasVideoContent = computed(() => videoTrackCount.value > 0 || !!props.frameUrl)
 const hasVideoTracks = computed(() => videoTrackCount.value > 0)
+const useFrameMode = computed(() => !props.stream && !!props.frameUrl)
 
 async function attachStream(stream, retryCount = 0) {
   if (!videoEl.value || !stream) {
@@ -133,7 +141,9 @@ onUnmounted(() => {
 <template>
   <div class="player-camera" :class="[`size-${size}`, { 'is-local': isLocal }]">
     <div class="camera-wrapper">
+      <!-- Video element for WebRTC stream -->
       <video
+        v-if="!useFrameMode"
         ref="videoEl"
         autoplay
         playsinline
@@ -141,8 +151,16 @@ onUnmounted(() => {
         class="camera-video"
       ></video>
 
-      <!-- Loading indicator when no video tracks -->
-      <div v-if="!hasVideoTracks" class="loading-indicator">
+      <!-- Image element for frame streaming (fallback) -->
+      <img
+        v-else
+        :src="frameUrl"
+        class="camera-frame"
+        alt="Player camera"
+      />
+
+      <!-- Loading indicator when no video content -->
+      <div v-if="!hasVideoContent" class="loading-indicator">
         <span>CONNECTING...</span>
       </div>
 
@@ -150,7 +168,7 @@ onUnmounted(() => {
       <div class="camera-scanlines"></div>
 
       <!-- Live indicator -->
-      <div v-if="hasVideoTracks" class="live-indicator">
+      <div v-if="hasVideoContent" class="live-indicator">
         <span class="live-dot"></span>
         LIVE
       </div>
@@ -268,6 +286,14 @@ onUnmounted(() => {
 }
 
 .camera-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  image-rendering: pixelated;
+}
+
+.camera-frame {
   width: 100%;
   height: 100%;
   object-fit: cover;
