@@ -16,7 +16,11 @@
       "Bash(git push:*)",
       "Bash(git checkout:*)",
       "Bash(git pull:*)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "Bash(timeout /t)",
+      "Skill(frontend-design:frontend-design)",
+      "Bash(npm run build:*)",
+      "Skill(frontend-design)"
     ]
   }
 }

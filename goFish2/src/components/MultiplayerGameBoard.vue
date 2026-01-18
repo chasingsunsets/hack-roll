@@ -662,8 +662,8 @@ function handleLeaveGame() {
 
     <!-- Main game area -->
     <div class="game-table">
-      <!-- Opponents row -->
-      <div class="opponents-row">
+      <!-- Opponents row - hide during deck swap to prevent card count glitches -->
+      <div class="opponents-row" v-if="!showDeckSwapTroll">
         <OpponentHand
           v-for="opp in opponentsWithStreams"
           :key="opp.id"
@@ -677,6 +677,12 @@ function handleLeaveGame() {
           :camera-stream="opp.cameraStream"
           @select="selectOpponentForAsk(opp.id)"
         />
+      </div>
+      <div class="opponents-row swap-placeholder-row" v-else>
+        <div class="swap-placeholder-opponent" v-for="opp in opponents" :key="opp.id">
+          <span>{{ opp.name }}</span>
+          <span class="swap-text">SWAPPING...</span>
+        </div>
       </div>
 
       <!-- Center area -->
@@ -712,11 +718,16 @@ function handleLeaveGame() {
             <span class="card-count-badge">{{ hand.length }} cards</span>
             <span v-if="isMyTurn" class="turn-indicator">YOUR TURN!</span>
           </div>
+          <!-- Hide hand during deck swap animation to prevent overlapping card sets -->
           <PlayerHand
+            v-if="!showDeckSwapTroll"
             :cards="hand"
             :selected-card="selectedCard"
             @select-card="selectCard"
           />
+          <div v-else class="hand-swap-placeholder">
+            <span>SWAPPING...</span>
+          </div>
         </div>
       </div>
     </div>
@@ -962,6 +973,48 @@ function handleLeaveGame() {
   border: 2px solid rgba(255, 255, 255, 0.2);
   color: #fff;
   font-size: 0.5rem;
+}
+
+/* Deck swap placeholder styles */
+.hand-swap-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  padding: 20px;
+  background: rgba(139, 71, 137, 0.2);
+  border: 3px dashed #8B4789;
+  color: #8B4789;
+  font-size: 1rem;
+  animation: swapPulse 0.5s ease-in-out infinite;
+}
+
+.swap-placeholder-row {
+  justify-content: center;
+  gap: 30px;
+}
+
+.swap-placeholder-opponent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 30px;
+  background: rgba(139, 71, 137, 0.2);
+  border: 3px dashed #8B4789;
+  color: #fff;
+  font-size: 0.6rem;
+}
+
+.swap-placeholder-opponent .swap-text {
+  color: #8B4789;
+  font-size: 0.5rem;
+  animation: swapPulse 0.5s ease-in-out infinite;
+}
+
+@keyframes swapPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 @media (max-width: 768px) {
