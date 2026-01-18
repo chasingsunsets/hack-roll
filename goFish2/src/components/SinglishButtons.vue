@@ -17,7 +17,7 @@ const slangs = [
 
 const cooldown = ref(false)
 
-function handleSlangClick(slang) {
+async function handleSlangClick(slang) {
   if (cooldown.value) return
 
   // Emit slang with audio file info
